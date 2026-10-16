@@ -1,4 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -7,6 +10,7 @@ using Store.Infrastructure.Catalog;
 using Store.Infrastructure.ErrorLogging;
 using Store.Infrastructure.Importing;
 using Store.Infrastructure.Orders;
+using Store.Infrastructure.Payments;
 
 namespace Store.Infrastructure;
 
@@ -25,6 +29,20 @@ public static class DependencyInjection
         }
 
         services.AddDbContextFactory<StoreDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddMemoryCache();
+        services.AddDataProtection().SetApplicationName("LoanPro.Store");
+        services.AddSingleton<IXmlRepository, EfCoreXmlRepository>();
+        services.AddSingleton<IConfigureOptions<KeyManagementOptions>, DatabaseKeyManagementOptions>();
+        services.AddSingleton<PaymentSecretsProtector>();
+        services.AddSingleton<IPaymentProvider, SimulatedPaymentProvider>();
+        services.AddHttpClient<PayPalPaymentProvider>(client =>
+            client.Timeout = TimeSpan.FromSeconds(15));
+        services.AddTransient<IPaymentProvider>(provider => provider.GetRequiredService<PayPalPaymentProvider>());
+        services.AddScoped<PaymentProviderRegistry>();
+        services.AddScoped<IPaymentProviderRegistry>(provider => provider.GetRequiredService<PaymentProviderRegistry>());
+        services.AddScoped<IPaymentProviderConfigurationReader>(
+            provider => provider.GetRequiredService<PaymentProviderRegistry>());
+        services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IDatabaseHealthReader, DatabaseHealthReader>();
         services.AddScoped<IProductCatalogReader, ProductCatalogReader>();
         services.AddScoped<IProductAdministration, Store.Infrastructure.Products.ProductAdministration>();

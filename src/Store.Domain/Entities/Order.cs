@@ -28,6 +28,8 @@ public sealed class Order
 
     public DateTime UpdatedAtUtc { get; private set; }
 
+    public ICollection<Payment> Payments { get; private set; } = new List<Payment>();
+
     public ICollection<OrderItem> Items { get; private set; } = new List<OrderItem>();
 
     private Order()
@@ -97,6 +99,18 @@ public sealed class Order
         }
 
         State = OrderState.Expired;
+        UpdatedAtUtc = nowUtc;
+        return true;
+    }
+
+    public bool MarkPaid(DateTime nowUtc)
+    {
+        if (State != OrderState.Reserved || ReservedUntilUtc <= nowUtc)
+        {
+            return false;
+        }
+
+        State = OrderState.Paid;
         UpdatedAtUtc = nowUtc;
         return true;
     }

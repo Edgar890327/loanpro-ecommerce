@@ -108,6 +108,8 @@ app.MapProductEndpoints();
 app.MapProductImportEndpoints();
 app.MapErrorLogEndpoints();
 Store.Api.Orders.OrderEndpoints.MapOrderEndpoints(app);
+Store.Api.Payments.PaymentEndpoints.MapPaymentEndpoints(app);
+Store.Api.Admin.PaymentProviderEndpoints.MapPaymentProviderEndpoints(app);
 
 app.MapFallbackToFile("index.html");
 
@@ -122,6 +124,9 @@ await using (var scope = app.Services.CreateAsyncScope())
 {
     var database = scope.ServiceProvider.GetRequiredService<StoreDbContext>();
     await database.Database.MigrateAsync();
+    await scope.ServiceProvider
+        .GetRequiredService<Store.Application.IPaymentProviderRegistry>()
+        .EnsureInitializedAsync(CancellationToken.None);
 }
 
 app.Run();

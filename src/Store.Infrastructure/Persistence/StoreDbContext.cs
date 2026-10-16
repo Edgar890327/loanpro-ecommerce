@@ -19,6 +19,12 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
 
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 
+    public DbSet<Payment> Payments => Set<Payment>();
+
+    public DbSet<PaymentProviderSetting> PaymentProviderSettings => Set<PaymentProviderSetting>();
+
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("pg_trgm");
@@ -147,6 +153,48 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
                 .WithMany()
                 .HasForeignKey(item => item.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.ToTable("Payments");
+            entity.HasKey(payment => payment.Id);
+            entity.Property(payment => payment.ProviderKey).HasMaxLength(64).IsRequired();
+            entity.Property(payment => payment.ExternalReference).HasMaxLength(128).IsRequired();
+            entity.Property(payment => payment.Status).HasMaxLength(16).IsRequired();
+            entity.Property(payment => payment.Amount).HasPrecision(12, 2).IsRequired();
+            entity.Property(payment => payment.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(payment => payment.CreatedAtUtc).IsRequired();
+            entity.Property(payment => payment.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(payment => payment.OrderId).IsUnique();
+            entity.HasIndex(payment => payment.ExternalReference);
+            entity.HasOne(payment => payment.Order)
+                .WithMany(order => order.Payments)
+                .HasForeignKey(payment => payment.OrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PaymentProviderSetting>(entity =>
+        {
+            entity.ToTable("PaymentProviderSettings");
+            entity.HasKey(setting => setting.ProviderKey);
+            entity.Property(setting => setting.ProviderKey).HasMaxLength(64);
+            entity.Property(setting => setting.PublicConfigurationJson).IsRequired();
+            entity.Property(setting => setting.ProtectedSecrets).IsRequired();
+            entity.Property(setting => setting.IsActive).IsRequired();
+            entity.Property(setting => setting.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(setting => setting.IsActive)
+                .IsUnique()
+                .HasFilter("\"IsActive\" = TRUE");
+        });
+
+        modelBuilder.Entity<DataProtectionKey>(entity =>
+        {
+            entity.ToTable("DataProtectionKeys");
+            entity.HasKey(key => key.Id);
+            entity.Property(key => key.FriendlyName).HasMaxLength(449).IsRequired();
+            entity.Property(key => key.Xml).IsRequired();
+            entity.HasIndex(key => key.FriendlyName).IsUnique();
         });
 
         modelBuilder.Entity<ErrorLog>(entity =>
