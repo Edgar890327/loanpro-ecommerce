@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PublicCatalogPage } from './PublicCatalogPage'
 import { PublicProductDetailPage } from './PublicProductDetailPage'
 import i18n from '../../../shared/i18n/i18n'
+import { CartProvider } from '../../cart/state/CartProvider'
 
 function LocationProbe() {
   const location = useLocation()
@@ -17,13 +18,15 @@ function renderCatalog(initialEntry: string) {
   })
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <LocationProbe />
-        <Routes>
-          <Route path="/" element={<PublicCatalogPage />} />
-          <Route path="/products/:id" element={<PublicProductDetailPage />} />
-        </Routes>
-      </MemoryRouter>
+      <CartProvider>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <LocationProbe />
+          <Routes>
+            <Route path="/" element={<PublicCatalogPage />} />
+            <Route path="/products/:id" element={<PublicProductDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </CartProvider>
     </QueryClientProvider>,
   )
 }

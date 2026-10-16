@@ -26,6 +26,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:-replace-with-a-random-secret-of-at-least-32-characters}
       JWT_EXPIRY_MINUTES: ${JWT_EXPIRY_MINUTES:-15}
       RESERVATION_TTL_MINUTES: ${RESERVATION_TTL_MINUTES:-15}
+      RESERVATION_TTL_SECONDS: ${RESERVATION_TTL_SECONDS:-}
+      RESERVATION_SCAN_INTERVAL_SECONDS: ${RESERVATION_SCAN_INTERVAL_SECONDS:-15}
+      Shipping__FlatRateUsd: ${Shipping__FlatRateUsd:-0.00}
       ERROR_LOG_RETENTION_DAYS: ${ERROR_LOG_RETENTION_DAYS:-30}
     depends_on:
       db:

@@ -1,10 +1,12 @@
 import { Link, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../shared/auth/auth-context'
+import { useCart } from '../../features/cart/state/useCart'
 
 export function Layout() {
   const { i18n, t } = useTranslation()
   const { token, signOut } = useAuth()
+  const { items } = useCart()
 
   return (
     <div className="app-shell">
@@ -14,6 +16,7 @@ export function Layout() {
         </Link>
         <nav aria-label={t('mainNavigation')}>
           <Link to="/">{t('home')}</Link>
+          <Link to="/cart">{t('cart')} ({items.reduce((count, item) => count + item.quantity, 0)})</Link>
           {token && <Link to="/admin/products">{t('products')}</Link>}
         </nav>
         {token

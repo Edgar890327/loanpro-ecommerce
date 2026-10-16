@@ -5,5 +5,6 @@ public enum ProductAdminOutcome
     Succeeded,
     NotFound,
     DuplicateSku,
-    ConcurrencyConflict
+    ConcurrencyConflict,
+    ReservedStockConflict
 }

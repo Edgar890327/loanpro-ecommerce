@@ -35,8 +35,8 @@ public sealed class ProductCatalogReader(StoreDbContext database) : IProductCata
         if (filters.InStock.HasValue)
         {
             products = filters.InStock.Value
-                ? products.Where(product => product.Stock > 0)
-                : products.Where(product => product.Stock == 0);
+                ? products.Where(product => product.Stock > product.Reserved)
+                : products.Where(product => product.Stock == product.Reserved);
         }
 
         var totalCount = await products.CountAsync(cancellationToken);
@@ -50,7 +50,7 @@ public sealed class ProductCatalogReader(StoreDbContext database) : IProductCata
                 product.Description,
                 product.Category.Name,
                 product.Price,
-                product.Stock,
+                product.Stock - product.Reserved,
                 product.WeightKg))
             .ToListAsync(cancellationToken);
         return new CatalogPage(items, filters.Page, filters.PageSize, totalCount);
@@ -91,7 +91,7 @@ public sealed class ProductCatalogReader(StoreDbContext database) : IProductCata
                 item.Description,
                 item.Category.Name,
                 item.Price,
-                item.Stock,
+                item.Stock - item.Reserved,
                 item.WeightKg))
             .SingleOrDefaultAsync(cancellationToken);
 

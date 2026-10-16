@@ -15,6 +15,10 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
 
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
 
+    public DbSet<Order> Orders => Set<Order>();
+
+    public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("pg_trgm");
@@ -31,7 +35,9 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
 
         modelBuilder.Entity<Product>(entity =>
         {
-            entity.ToTable("Products");
+            entity.ToTable("Products", table => table.HasCheckConstraint(
+                "CK_Products_Stock_Reserved",
+                "\"Stock\" >= \"Reserved\" AND \"Reserved\" >= 0"));
             entity.HasKey(product => product.Id);
             entity.Property(product => product.Name).HasMaxLength(200).IsRequired();
             entity.Property(product => product.Sku).HasMaxLength(64).IsRequired();
@@ -41,6 +47,7 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
             entity.Property(product => product.SearchText).HasMaxLength(2300).IsRequired();
             entity.Property(product => product.Price).HasPrecision(12, 2).IsRequired();
             entity.Property(product => product.Stock).IsRequired();
+            entity.Property(product => product.Reserved).HasDefaultValue(0).IsRequired();
             entity.Property(product => product.WeightKg).HasPrecision(12, 3);
             entity.Property(product => product.IsDeleted).IsRequired();
             entity.Property(product => product.CreatedAtUtc).IsRequired();
@@ -87,6 +94,7 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
             entity.Property(movement => movement.CreatedAtUtc).IsRequired();
             entity.HasIndex(movement => movement.ProductId);
             entity.HasIndex(movement => movement.ImportBatchId);
+            entity.HasIndex(movement => movement.OrderId);
             entity.HasOne(movement => movement.Product)
                 .WithMany()
                 .HasForeignKey(movement => movement.ProductId)
@@ -94,6 +102,50 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
             entity.HasOne(movement => movement.ImportBatch)
                 .WithMany(batch => batch.StockMovements)
                 .HasForeignKey(movement => movement.ImportBatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(movement => movement.Order)
+                .WithMany()
+                .HasForeignKey(movement => movement.OrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Order>(entity =>
+        {
+            entity.ToTable("Orders");
+            entity.HasKey(order => order.Id);
+            entity.Property(order => order.IdempotencyKeyHash).HasMaxLength(64).IsRequired();
+            entity.Property(order => order.RequestHash).HasMaxLength(64).IsRequired();
+            entity.Property(order => order.CustomerName).HasMaxLength(200).IsRequired();
+            entity.Property(order => order.CustomerEmail).HasMaxLength(320).IsRequired();
+            entity.Property(order => order.ShippingAddress).HasMaxLength(1000).IsRequired();
+            entity.Property(order => order.Subtotal).HasPrecision(12, 2).IsRequired();
+            entity.Property(order => order.Shipping).HasPrecision(12, 2).IsRequired();
+            entity.Property(order => order.Total).HasPrecision(12, 2).IsRequired();
+            entity.Property(order => order.State).HasConversion<string>().HasMaxLength(16).IsRequired();
+            entity.Property(order => order.CreatedAtUtc).IsRequired();
+            entity.Property(order => order.ReservedUntilUtc).IsRequired();
+            entity.Property(order => order.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(order => order.IdempotencyKeyHash).IsUnique();
+            entity.HasIndex(order => new { order.State, order.ReservedUntilUtc });
+        });
+
+        modelBuilder.Entity<OrderItem>(entity =>
+        {
+            entity.ToTable("OrderItems");
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.ProductName).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.ProductSku).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.Quantity).IsRequired();
+            entity.Property(item => item.UnitPrice).HasPrecision(12, 2).IsRequired();
+            entity.Ignore(item => item.Subtotal);
+            entity.HasIndex(item => item.OrderId);
+            entity.HasOne(item => item.Order)
+                .WithMany(order => order.Items)
+                .HasForeignKey(item => item.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.Product)
+                .WithMany()
+                .HasForeignKey(item => item.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

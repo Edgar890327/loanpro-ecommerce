@@ -8,9 +8,13 @@ public sealed class StockMovement
 
     public Product Product { get; private set; } = null!;
 
-    public Guid ImportBatchId { get; private set; }
+    public Guid? ImportBatchId { get; private set; }
 
-    public ImportBatch ImportBatch { get; private set; } = null!;
+    public ImportBatch? ImportBatch { get; private set; }
+
+    public Guid? OrderId { get; private set; }
+
+    public Order? Order { get; private set; }
 
     public string Type { get; private set; } = string.Empty;
 
@@ -27,6 +31,20 @@ public sealed class StockMovement
         ProductId = productId;
         ImportBatchId = importBatchId;
         Type = "Import";
+        Quantity = quantity;
+        CreatedAtUtc = createdAtUtc;
+    }
+
+    public StockMovement(Guid productId, Guid orderId, string type, int quantity, DateTime createdAtUtc)
+    {
+        if (quantity < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantity));
+        }
+
+        ProductId = productId;
+        OrderId = orderId;
+        Type = type;
         Quantity = quantity;
         CreatedAtUtc = createdAtUtc;
     }

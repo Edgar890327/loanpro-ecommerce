@@ -6,6 +6,7 @@ using Store.Application;
 using Store.Infrastructure.Catalog;
 using Store.Infrastructure.ErrorLogging;
 using Store.Infrastructure.Importing;
+using Store.Infrastructure.Orders;
 
 namespace Store.Infrastructure;
 
@@ -30,6 +31,28 @@ public static class DependencyInjection
         services.AddScoped<IErrorLogReader, ErrorLogReader>();
         services.AddSingleton<ProductCsvParser>();
         services.AddScoped<IProductImportService, ProductImportService>();
+        services.AddSingleton<IShippingStrategy, FlatRateShippingStrategy>();
+        services.AddScoped<IOrderService, OrderService>();
+        var reservationTtlSeconds = configuration.GetValue<int?>("RESERVATION_TTL_SECONDS");
+        var reservationTtlMinutes = configuration.GetValue<int>("RESERVATION_TTL_MINUTES", 15);
+        var reservationOptions = new ReservationOptions
+        {
+            TimeToLive = reservationTtlSeconds.HasValue
+                ? TimeSpan.FromSeconds(reservationTtlSeconds.Value)
+                : TimeSpan.FromMinutes(reservationTtlMinutes),
+            ScanInterval = TimeSpan.FromSeconds(
+                configuration.GetValue<int>("RESERVATION_SCAN_INTERVAL_SECONDS", 15)),
+            BatchSize = configuration.GetValue<int>("RESERVATION_EXPIRATION_BATCH_SIZE", 100)
+        };
+        if (reservationOptions.TimeToLive <= TimeSpan.Zero ||
+            reservationOptions.ScanInterval <= TimeSpan.Zero ||
+            reservationOptions.BatchSize < 1)
+        {
+            throw new InvalidOperationException("Reservation settings must be positive.");
+        }
+
+        services.AddSingleton(reservationOptions);
+        services.AddHostedService<ReservationExpirationService>();
         var errorLogOptions = configuration.GetSection(ErrorLogOptions.SectionName)
             .Get<ErrorLogOptions>() ?? new ErrorLogOptions();
         var retentionDays = configuration.GetValue<int?>("ERROR_LOG_RETENTION_DAYS");

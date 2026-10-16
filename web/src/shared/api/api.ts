@@ -3,13 +3,17 @@ export class ApiError extends Error {
 
   public readonly detail?: string
 
+  public readonly title?: string
+
   constructor(
     status: number,
     detail?: string,
+    title?: string,
   ) {
     super(detail ?? `Request failed with status ${status}.`)
     this.status = status
     this.detail = detail
+    this.title = title
   }
 }
 
@@ -32,7 +36,7 @@ export async function apiRequest<T>(
   }
   if (!response.ok) {
     const problem = await response.json().catch(() => null) as { detail?: string; title?: string } | null
-    throw new ApiError(response.status, problem?.detail ?? problem?.title)
+    throw new ApiError(response.status, problem?.detail ?? problem?.title, problem?.title)
   }
   if (response.status === 204) {
     return undefined as T

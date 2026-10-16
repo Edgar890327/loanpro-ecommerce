@@ -107,6 +107,7 @@ app.MapCatalogEndpoints();
 app.MapProductEndpoints();
 app.MapProductImportEndpoints();
 app.MapErrorLogEndpoints();
+Store.Api.Orders.OrderEndpoints.MapOrderEndpoints(app);
 
 app.MapFallbackToFile("index.html");
 

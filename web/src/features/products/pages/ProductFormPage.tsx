@@ -65,6 +65,8 @@ export function ProductFormPage() {
       setFormError(error instanceof ApiError && error.status === 409
         ? error.detail?.includes('SKU')
           ? t('duplicateSku')
+          : error.title === 'Stock is reserved'
+            ? t('reservedStockConflict')
           : t('conflict')
         : t('requestFailed'))
     },

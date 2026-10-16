@@ -110,6 +110,11 @@ public sealed class ProductAdministration(
             return new ProductAdminResult(ProductAdminOutcome.NotFound, null);
         }
 
+        if (input.Stock < product.Reserved)
+        {
+            return new ProductAdminResult(ProductAdminOutcome.ReservedStockConflict, null);
+        }
+
         database.Entry(product).Property<uint>("xmin").OriginalValue = version;
         var category = await FindOrCreateCategoryAsync(database, input.Category!, cancellationToken);
         product.Update(

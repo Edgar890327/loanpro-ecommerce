@@ -99,6 +99,7 @@ public static class ProductEndpoints
             ProductAdminOutcome.NotFound => Results.NotFound(),
             ProductAdminOutcome.DuplicateSku => DuplicateSku(),
             ProductAdminOutcome.ConcurrencyConflict => ConcurrencyConflict(),
+            ProductAdminOutcome.ReservedStockConflict => ReservedStockConflict(),
             _ => Results.Ok(ProductResponse.From(result.Product!))
         };
     }
@@ -124,5 +125,12 @@ public static class ProductEndpoints
         Status = StatusCodes.Status409Conflict,
         Title = "Product was modified",
         Detail = "This product changed after it was loaded. Refresh it and reapply your changes."
+    });
+
+    private static IResult ReservedStockConflict() => Results.Conflict(new ProblemDetails
+    {
+        Status = StatusCodes.Status409Conflict,
+        Title = "Stock is reserved",
+        Detail = "Stock cannot be reduced below the quantity currently reserved by active orders."
     });
 }

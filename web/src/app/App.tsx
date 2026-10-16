@@ -10,6 +10,10 @@ import { ProductFormPage } from '../features/products/pages/ProductFormPage'
 import { ProductListPage } from '../features/products/pages/ProductListPage'
 import { PublicCatalogPage } from '../features/catalog/pages/PublicCatalogPage'
 import { PublicProductDetailPage } from '../features/catalog/pages/PublicProductDetailPage'
+import { CartPage } from '../features/cart/pages/CartPage'
+import { CheckoutPage } from '../features/cart/pages/CheckoutPage'
+import { OrderStatusPage } from '../features/cart/pages/OrderStatusPage'
+import { CartProvider } from '../features/cart/state/CartProvider'
 
 const queryClient = new QueryClient()
 
@@ -19,6 +23,9 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <PublicCatalogPage /> },
       { path: '/products/:id', element: <PublicProductDetailPage /> },
+      { path: '/cart', element: <CartPage /> },
+      { path: '/checkout', element: <CheckoutPage /> },
+      { path: '/orders/:id', element: <OrderStatusPage /> },
       { path: '/login', element: <LoginPage /> },
       {
         path: '/admin',
@@ -42,9 +49,11 @@ const router = createBrowserRouter([
 export default function App() {
   return (
     <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
+      <CartProvider>
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
+      </CartProvider>
     </AuthProvider>
   )
 }

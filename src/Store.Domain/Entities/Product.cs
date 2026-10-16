@@ -26,6 +26,10 @@ public sealed class Product
 
     public int Stock { get; private set; }
 
+    public int Reserved { get; private set; }
+
+    public int Available => Stock - Reserved;
+
     public decimal? WeightKg { get; private set; }
 
     public bool IsDeleted { get; private set; }
@@ -67,6 +71,11 @@ public sealed class Product
         decimal? weightKg,
         DateTime nowUtc)
     {
+        if (stock < Reserved)
+        {
+            throw new InvalidOperationException("Stock cannot be lower than reserved inventory.");
+        }
+
         Name = name.Trim();
         NameNormalized = ProductTextNormalizer.Normalize(Name);
         Sku = sku.Trim();
