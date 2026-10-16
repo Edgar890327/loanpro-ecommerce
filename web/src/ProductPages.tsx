@@ -54,7 +54,10 @@ export function ProductListPage() {
     <section className="panel">
       <div className="page-heading">
         <h1>{t('productsTitle')}</h1>
-        <Link className="primary-button" to="/admin/products/new">{t('addProduct')}</Link>
+        <div className="page-heading-actions">
+          <Link className="secondary-button" to="/admin/products/import">{t('importProducts')}</Link>
+          <Link className="primary-button" to="/admin/products/new">{t('addProduct')}</Link>
+        </div>
       </div>
       {products.isLoading && <p>{t('loading')}</p>}
       {products.isError && <p role="alert">{t('failedToLoad')}</p>}

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Store.Application;
 using Store.Infrastructure.ErrorLogging;
+using Store.Infrastructure.Importing;
 
 namespace Store.Infrastructure;
 
@@ -22,6 +23,8 @@ public static class DependencyInjection
         }
 
         services.AddDbContextFactory<StoreDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddSingleton<ProductCsvParser>();
+        services.AddScoped<ProductImportService>();
         var errorLogOptions = configuration.GetSection(ErrorLogOptions.SectionName)
             .Get<ErrorLogOptions>() ?? new ErrorLogOptions();
         var retentionDays = configuration.GetValue<int?>("ERROR_LOG_RETENTION_DAYS");

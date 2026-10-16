@@ -1,6 +1,6 @@
 # LoanPro E-Commerce
 
-An enterprise e-commerce application built with .NET 10, PostgreSQL, and React. The current milestones provide a public product catalog with searchable filters and product details, JWT-protected product administration, and asynchronous persistent error logging. Import, checkout, and payment business logic remain for later milestones.
+An enterprise e-commerce application built with .NET 10, PostgreSQL, and React. The current milestones provide a public product catalog with searchable filters and product details, JWT-protected product administration, asynchronous persistent error logging, and auditable CSV product imports. Checkout and payment business logic remain for later milestones.
 
 ## Requirements
 
@@ -52,7 +52,7 @@ Vite serves the development UI (normally at <http://localhost:5173>); the API an
 ## Tests and quality checks
 
 ```sh
-dotnet test tests/Store.UnitTests/Store.UnitTests.csproj -p:CollectCoverage=true -p:Threshold=80 -p:ThresholdType=line -p:ThresholdStat=total -p:ExcludeByFile="**/Program.cs%2c**/StoreDbContextFactory.cs%2c**/Migrations/*.cs%2c**/EfCoreErrorLogBatchStore.cs%2c**/ProductEndpoints.cs%2c**/CatalogEndpoints.cs%2c**/ErrorLogEndpoints.cs%2c**/AuthEndpoints.cs"
+dotnet test tests/Store.UnitTests/Store.UnitTests.csproj -p:CollectCoverage=true -p:Threshold=80 -p:ThresholdType=line -p:ThresholdStat=total -p:ExcludeByFile="**/Program.cs%2c**/StoreDbContextFactory.cs%2c**/Migrations/*.cs%2c**/EfCoreErrorLogBatchStore.cs%2c**/ProductEndpoints.cs%2c**/CatalogEndpoints.cs%2c**/ErrorLogEndpoints.cs%2c**/AuthEndpoints.cs%2c**/ProductImportEndpoints.cs%2c**/ProductImportService.cs"
 dotnet test tests/Store.IntegrationTests/Store.IntegrationTests.csproj
 cd web
 npm ci
@@ -61,7 +61,7 @@ npm run test:run
 npm run build
 ```
 
-The PostgreSQL integration tests use Testcontainers and require a working Docker daemon. The unit-test command enforces an 80% line-coverage threshold; it excludes the process entry point, design-time context factory, generated migrations, the EF batch store, and HTTP endpoints covered by PostgreSQL integration tests. GitHub Actions runs the backend build, unit and PostgreSQL integration tests, frontend lint, frontend smoke test, and production frontend build.
+The PostgreSQL integration tests use Testcontainers and require a working Docker daemon. The unit-test command enforces an 80% line-coverage threshold; it excludes the process entry point, design-time context factory, generated migrations, EF batch stores, import persistence service, and HTTP endpoints covered by PostgreSQL integration tests. GitHub Actions runs the backend build, unit and PostgreSQL integration tests, frontend lint, frontend smoke test, and production frontend build.
 
 ## Architecture and decisions
 
@@ -77,9 +77,13 @@ The PostgreSQL integration tests use Testcontainers and require a working Docker
 - The API returns ProblemDetails for unhandled errors and non-success status codes, exposes `/health` with a PostgreSQL connectivity check, publishes Swagger UI, writes structured Serilog request logs, and assigns a GUID `X-Correlation-ID` to each request. A valid incoming correlation ID is preserved.
 - Unhandled exceptions return ProblemDetails with the correlation ID and enter a bounded in-memory `Channel<ErrorLog>`. A hosted worker writes logs to PostgreSQL in batches through independently created EF Core contexts; persistence failures are reported through Serilog without changing the request response. Error records contain a generic message and route template, not request bodies, authorization headers, query strings, exception messages, or raw paths. `ERROR_LOG_RETENTION_DAYS` controls background deletion of older entries and defaults to 30.
 - The `ErrorLog` table stores UTC timestamps, severity, correlation ID, exception type and stack trace, HTTP method, route template, status code, and optional order and payment-provider keys. Timestamp and correlation ID are indexed.
+- Admins can upload products through `POST /api/admin/products/import` using multipart fields `file` and `dryRun`; `confirmReimport=true` explicitly authorizes adding stock again for a previously imported file. The CSV must be UTF-8 (with or without BOM), contain the exact columns `name,sku,description,category,price,stock,weight_kg`, and be at most 10 MiB and 10,000 data rows. CsvHelper handles escaped quotes, commas, and line breaks inside fields.
+- Imports return a row-by-row status and messages, plus counts for products created, stock units applied, warnings, rejected rows, and exact duplicate rows. Invalid rows are reported and skipped. A `$` in a valid price is removed with a warning; empty categories become `Uncategorized`, and empty weights become null, both with warnings. A duplicate normalized SKU in one file adds its stock and retains the first row's product fields; exact copies are counted separately, while differences are reported. Existing products are matched by normalized SKU and receive an atomic stock increment only; their other fields are not overwritten. Categories are created using normalized names.
+- `dryRun=true` returns the planned report without changing products, categories, import batches, or stock movements. Applied imports record a SHA-256 file hash, UTC creation time, row and summary counts, and admin identity in `ImportBatches`; each applied product quantity is recorded as an `Import` `StockMovement` linked to its batch. An unconfirmed repeated hash returns HTTP 409 and the report; explicit confirmation creates a new auditable batch and applies the stock again.
+- The checked-in CSV fixture is derived from the provided workbook. Its golden integration test verifies 95 data rows: 87 products created, 121,737 stock units applied, 6 warnings, 5 rejected rows, and 1 exact duplicate.
 - The frontend uses Vite, React, TypeScript, React Router, TanStack Query, and react-i18next. All admin UI text is available in English (`en-US`) and Spanish (`es`).
 - Docker uses separate frontend build, .NET publish, and ASP.NET runtime stages. Compose exposes the app on port 8080 and gates startup on PostgreSQL health. An end-to-end Compose profile is left for milestone 9 rather than adding placeholder test services now.
-- The currency, payment, shipping, inventory, and import policies remain for their respective implementation milestones; this scaffold does not introduce behavior or defaults for them.
+- The currency is fixed to USD. Checkout, shipping, inventory reservation, and payment policies remain for their respective implementation milestones; this scaffold does not introduce behavior or defaults for them.
 
 ## Alternatives considered
 
@@ -91,4 +95,5 @@ The PostgreSQL integration tests use Testcontainers and require a working Docker
 - **Concurrency token:** an application-managed integer version would work across database providers, but PostgreSQL's `xmin` already changes on each row update and avoids maintaining a second counter. The API exposes it as an opaque unsigned `version` and uses it as EF Core's concurrency token.
 - **SKU uniqueness:** relying on PostgreSQL collation for case-insensitive comparison is locale-dependent, and trimming only on input does not prevent inconsistent stored values. A normalized invariant-uppercase key and unique index make case/outer-whitespace behavior explicit and portable.
 - **Catalog search:** PostgreSQL full-text search provides linguistic tokenization and ranking, but its token matching is not the requested substring search across names, SKUs, and descriptions. A plain `ILIKE` query has the desired behavior but can scan the entire product table. Persisted accent-normalized search text with `pg_trgm` GIN indexing retains substring semantics while accelerating typical searches. `unaccent` is used only for migration backfill; application writes use the same .NET normalizer as incoming queries, avoiding per-query extension calls and expression-index coupling.
+- **CSV parsing and import:** a hand-written CSV parser would avoid a dependency but risks mishandling escaped quotes and multiline fields, so CsvHelper is used with strict headers, UTF-8 validation, and explicit file and row limits. Rejecting an entire file on any invalid row would make large catalog uploads harder to recover; instead, valid rows are planned and reported individually while invalid rows are skipped. Existing product rows are updated with an atomic SQL stock increment rather than read-modify-write, preventing lost updates when imports run concurrently. A file hash provides idempotency detection, but repeated imports require explicit confirmation because they intentionally add stock again. Import batches and stock movements provide an audit trail without mixing inventory history into product fields.
 - **Admin authentication:** HTTP Basic authentication would resend the long-lived password on each request, while persisting admin credentials would introduce another secret store. A configured password exchanged once for a short-lived signed JWT keeps the challenge's single-admin setup small without storing the password in the database.

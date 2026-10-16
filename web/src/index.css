@@ -298,6 +298,12 @@ button {
   margin-bottom: 1.5rem;
 }
 
+.page-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
 .primary-button,
 .secondary-button,
 .pagination button {
@@ -377,6 +383,104 @@ th {
 .form-panel {
   width: min(42rem, 100%);
   margin: 0 auto;
+}
+
+.import-panel > p {
+  color: #5c6679;
+}
+
+.import-file {
+  display: grid;
+  gap: 0.5rem;
+  width: min(38rem, 100%);
+  margin: 1.25rem 0 0.5rem;
+  color: #344054;
+  font-weight: 650;
+}
+
+.import-file input {
+  width: 100%;
+  padding: 0.8rem;
+  background: #fff;
+  border: 1px dashed #98a2b3;
+  border-radius: 0.55rem;
+}
+
+.import-file-name,
+.import-hash {
+  overflow-wrap: anywhere;
+  font-size: 0.88rem;
+}
+
+.import-panel .form-actions {
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+
+.import-warning {
+  margin: 1rem 0;
+  padding: 1rem;
+  color: #7a2e0e;
+  background: #fffaeb;
+  border: 1px solid #fedf89;
+  border-radius: 0.65rem;
+}
+
+.import-warning p {
+  margin: 0 0 0.75rem;
+}
+
+.import-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-weight: 650;
+}
+
+.import-confirm input {
+  margin-top: 0.2rem;
+}
+
+.import-report {
+  margin-top: 2rem;
+}
+
+.import-report h2 {
+  margin-bottom: 0.5rem;
+}
+
+.import-reimport-mark {
+  color: #93370d;
+  font-weight: 700;
+}
+
+.import-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.8rem;
+  margin: 1.25rem 0;
+}
+
+.import-summary div {
+  padding: 0.8rem;
+  background: #f5f7fb;
+  border-radius: 0.55rem;
+}
+
+.import-summary dt {
+  color: #667085;
+  font-size: 0.8rem;
+}
+
+.import-summary dd {
+  margin: 0.35rem 0 0;
+  font-size: 1.2rem;
+  font-weight: 750;
+}
+
+.import-report td:last-child {
+  min-width: 16rem;
+  overflow-wrap: anywhere;
 }
 
 .form-panel h1 {
@@ -462,5 +566,14 @@ th {
   .catalog-toolbar,
   .product-detail dl {
     grid-template-columns: 1fr;
+  }
+
+  .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .page-heading-actions {
+    width: 100%;
   }
 }

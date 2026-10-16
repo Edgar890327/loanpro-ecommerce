@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { AuthProvider, ProtectedRoute } from './auth'
 import { Layout } from './Layout'
 import { LoginPage } from './LoginPage'
+import { ProductImportPage } from './ProductImportPage'
 import { ProductFormPage, ProductListPage } from './ProductPages'
 import { PublicCatalogPage, PublicProductDetailPage } from './PublicCatalogPages'
 
@@ -22,6 +23,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="products" replace /> },
           { path: 'products', element: <ProductListPage /> },
+          { path: 'products/import', element: <ProductImportPage /> },
           { path: 'products/new', element: <ProductFormPage /> },
           { path: 'products/:id/edit', element: <ProductFormPage /> },
         ],

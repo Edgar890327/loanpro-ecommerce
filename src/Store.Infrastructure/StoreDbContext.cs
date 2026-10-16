@@ -11,6 +11,10 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
 
     public DbSet<Product> Products => Set<Product>();
 
+    public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
+
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("pg_trgm");
@@ -54,6 +58,42 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
             entity.HasOne(product => product.Category)
                 .WithMany(category => category.Products)
                 .HasForeignKey(product => product.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ImportBatch>(entity =>
+        {
+            entity.ToTable("ImportBatches");
+            entity.HasKey(batch => batch.Id);
+            entity.Property(batch => batch.FileHash).HasMaxLength(64).IsRequired();
+            entity.Property(batch => batch.CreatedAtUtc).IsRequired();
+            entity.Property(batch => batch.RowCount).IsRequired();
+            entity.Property(batch => batch.CreatedProducts).IsRequired();
+            entity.Property(batch => batch.StockAdded).IsRequired();
+            entity.Property(batch => batch.WarningCount).IsRequired();
+            entity.Property(batch => batch.RejectedCount).IsRequired();
+            entity.Property(batch => batch.ExactDuplicateCount).IsRequired();
+            entity.Property(batch => batch.ImportedBy).HasMaxLength(200).IsRequired();
+            entity.HasIndex(batch => batch.FileHash);
+            entity.HasIndex(batch => batch.CreatedAtUtc);
+        });
+
+        modelBuilder.Entity<StockMovement>(entity =>
+        {
+            entity.ToTable("StockMovements");
+            entity.HasKey(movement => movement.Id);
+            entity.Property(movement => movement.Type).HasMaxLength(32).IsRequired();
+            entity.Property(movement => movement.Quantity).IsRequired();
+            entity.Property(movement => movement.CreatedAtUtc).IsRequired();
+            entity.HasIndex(movement => movement.ProductId);
+            entity.HasIndex(movement => movement.ImportBatchId);
+            entity.HasOne(movement => movement.Product)
+                .WithMany()
+                .HasForeignKey(movement => movement.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(movement => movement.ImportBatch)
+                .WithMany(batch => batch.StockMovements)
+                .HasForeignKey(movement => movement.ImportBatchId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

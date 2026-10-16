@@ -104,6 +104,7 @@ app.MapGet("/health", async (StoreDbContext database, CancellationToken cancella
 app.MapAuthEndpoints();
 app.MapCatalogEndpoints();
 app.MapProductEndpoints();
+app.MapProductImportEndpoints();
 app.MapErrorLogEndpoints();
 
 app.MapFallbackToFile("index.html");

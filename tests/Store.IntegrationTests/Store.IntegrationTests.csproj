@@ -24,4 +24,8 @@
     <ProjectReference Include="..\..\src\Store.Api\Store.Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\fixtures\loanpro-products.csv" Link="fixtures\loanpro-products.csv" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
