@@ -5,15 +5,23 @@ export class ApiError extends Error {
 
   public readonly title?: string
 
+  public readonly code?: string
+
+  public readonly correlationId?: string
+
   constructor(
     status: number,
     detail?: string,
     title?: string,
+    code?: string,
+    correlationId?: string,
   ) {
     super(detail ?? `Request failed with status ${status}.`)
     this.status = status
     this.detail = detail
     this.title = title
+    this.code = code
+    this.correlationId = correlationId
   }
 }
 
@@ -35,11 +43,36 @@ export async function apiRequest<T>(
     window.dispatchEvent(new Event('store:unauthorized'))
   }
   if (!response.ok) {
-    const problem = await response.json().catch(() => null) as { detail?: string; title?: string } | null
-    throw new ApiError(response.status, problem?.detail ?? problem?.title, problem?.title)
+    const problem = await response.json().catch(() => null) as {
+      detail?: string
+      title?: string
+      code?: string
+      correlationId?: string
+    } | null
+    throw new ApiError(
+      response.status,
+      problem?.detail ?? problem?.title,
+      problem?.title,
+      problem?.code,
+      problem?.correlationId,
+    )
   }
+
   if (response.status === 204) {
     return undefined as T
   }
   return response.json() as Promise<T>
+}
+
+export function translateApiError(
+  error: unknown,
+  translate: (key: string, options?: Record<string, unknown>) => string,
+  fallbackKey = 'requestFailed',
+) {
+  if (error instanceof ApiError && error.code) {
+    const translationKey = `serverError_${error.code}`
+    const translated = translate(translationKey, { correlationId: error.correlationId ?? '' })
+    if (translated !== translationKey) return translated
+  }
+  return translate(fallbackKey)
 }

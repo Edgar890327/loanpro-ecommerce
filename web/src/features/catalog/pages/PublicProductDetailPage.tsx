@@ -1,13 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { apiRequest } from '../../../shared/api/api'
+import { apiRequest, translateApiError } from '../../../shared/api/api'
 import { StockBadge } from '../../../components/atoms/StockBadge'
 import type { CatalogProduct } from '../types/CatalogProduct'
 import { useCart } from '../../cart/state/useCart'
+import { formatCurrency, formatNumber } from '../../../shared/i18n/format'
+import { LoadingSkeleton } from '../../../components/atoms/LoadingSkeleton'
 
 export function PublicProductDetailPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const { addProduct } = useCart()
@@ -17,9 +19,9 @@ export function PublicProductDetailPage() {
     enabled: Boolean(id),
   })
 
-  if (product.isLoading) return <p role="status">{t('loading')}</p>
+  if (product.isLoading) return <LoadingSkeleton rows={4} />
   if (product.isError || !product.data) {
-    return <section className="panel"><p role="alert">{t('productLoadError')}</p><Link to="/">{t('backToCatalog')}</Link></section>
+    return <section className="panel"><p role="alert">{translateApiError(product.error, t, 'productLoadError')}</p><Link to="/">{t('backToCatalog')}</Link></section>
   }
 
   return (
@@ -32,8 +34,8 @@ export function PublicProductDetailPage() {
       <p>{product.data.description}</p>
       <dl>
         <div><dt>{t('sku')}</dt><dd>{product.data.sku}</dd></div>
-        <div><dt>{t('price')}</dt><dd>${product.data.price.toFixed(2)}</dd></div>
-        <div><dt>{t('weight')}</dt><dd>{product.data.weightKg ?? t('notSpecified')}</dd></div>
+        <div><dt>{t('price')}</dt><dd>{formatCurrency(product.data.price, i18n.language)}</dd></div>
+        <div><dt>{t('weight')}</dt><dd>{product.data.weightKg === null ? t('notSpecified') : formatNumber(product.data.weightKg, i18n.language)}</dd></div>
         <div><dt>{t('availability')}</dt><dd><StockBadge stock={product.data.stock} /></dd></div>
       </dl>
       <button type="button" disabled={product.data.stock <= 0} onClick={() => addProduct(product.data!)}>

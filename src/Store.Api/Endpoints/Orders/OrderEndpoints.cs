@@ -87,16 +87,15 @@ public static class OrderEndpoints
                 OrderResponse.From(result.Order)),
             OrderOutcome.Existing => Results.Ok(OrderResponse.From(result.Order!)),
             OrderOutcome.OutOfStock => StockConflict(result.Issues),
-            OrderOutcome.AmountOutOfRange => Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Order total is outside the supported range",
-                detail: "The order total must fit the supported USD amount."),
-            OrderOutcome.IdempotencyConflict => Results.Conflict(new ProblemDetails
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "Idempotency key was already used",
-                Detail = "Use a new key when submitting a different order."
-            }),
+            OrderOutcome.AmountOutOfRange => Problem(
+                StatusCodes.Status400BadRequest,
+                "order_amount_out_of_range",
+                "Order total is outside the supported range",
+                "The order total must fit the supported USD amount."),
+            OrderOutcome.IdempotencyConflict => Conflict(
+                "idempotency_conflict",
+                "Idempotency key was already used",
+                "Use a new key when submitting a different order."),
             _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
         };
     }
@@ -130,12 +129,10 @@ public static class OrderEndpoints
         return result.Outcome switch
         {
             OrderOutcome.Created => Results.Ok(OrderResponse.From(result.Order!)),
-            OrderOutcome.AlreadyFinalized => Results.Conflict(new ProblemDetails
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "Order can no longer be cancelled",
-                Detail = "Only a reserved order can be cancelled."
-            }),
+            OrderOutcome.AlreadyFinalized => Conflict(
+                "order_not_cancellable",
+                "Order can no longer be cancelled",
+                "Only a reserved order can be cancelled."),
             _ => Results.NotFound()
         };
     }
@@ -152,6 +149,28 @@ public static class OrderEndpoints
             Detail = "One or more products no longer have enough available inventory."
         };
         problem.Extensions["items"] = issues;
+        problem.Extensions["code"] = "inventory_changed";
         return Results.Conflict(problem);
+    }
+
+    private static IResult Conflict(string code, string title, string detail)
+    {
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status409Conflict,
+            Title = title,
+            Detail = detail
+        };
+        problem.Extensions["code"] = code;
+        return Results.Conflict(problem);
+    }
+
+    private static IResult Problem(int status, string code, string title, string detail)
+    {
+        return Results.Problem(
+            statusCode: status,
+            title: title,
+            detail: detail,
+            extensions: new Dictionary<string, object?> { ["code"] = code });
     }
 }

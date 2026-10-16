@@ -6,6 +6,7 @@ export type Product = {
   category: string
   price: number
   stock: number
+  availableStock: number
   weightKg: number | null
   isDeleted: boolean
   createdAtUtc: string

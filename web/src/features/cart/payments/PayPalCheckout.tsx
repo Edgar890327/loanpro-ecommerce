@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { capturePayment, createPayment } from './paymentApi'
+import { translateApiError } from '../../../shared/api/api'
 
 type PayPalButtons = {
   render: (selector: string) => Promise<void>
@@ -32,8 +33,14 @@ export function PayPalCheckout({ orderId, capability, clientId = '', onCaptured 
   const { t } = useTranslation()
   const container = useRef<HTMLDivElement>(null)
   const externalReference = useRef<string | null>(null)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
+  const showPaymentError = useRef<(reason?: unknown) => void>(() => undefined)
+  showPaymentError.current = (reason) => {
+    setError(reason
+      ? translateApiError(reason, t, 'paymentFailedRetry')
+      : t('paymentFailedRetry'))
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -46,14 +53,19 @@ export function PayPalCheckout({ orderId, capability, clientId = '', onCaptured 
       try {
         void window.paypal.Buttons({
           createOrder: async () => {
-            const payment = await createPayment(orderId, capability)
-            externalReference.current = payment.externalReference
-            return payment.externalReference
+            try {
+              const payment = await createPayment(orderId, capability)
+              externalReference.current = payment.externalReference
+              return payment.externalReference
+            } catch (reason) {
+              showPaymentError.current(reason)
+              throw reason
+            }
           },
           onApprove: async (data) => {
             const reference = externalReference.current
             if (!reference || reference !== data.orderID) {
-              setError(true)
+              showPaymentError.current()
               return
             }
 
@@ -62,25 +74,25 @@ export function PayPalCheckout({ orderId, capability, clientId = '', onCaptured 
               if (result.paymentStatus === 'Approved' || result.paymentStatus === 'Failed') {
                 onCaptured()
               } else {
-                setError(true)
+                showPaymentError.current()
               }
-            } catch {
-              setError(true)
+            } catch (reason) {
+              showPaymentError.current(reason)
             }
           },
-          onError: () => setError(true),
+          onError: () => showPaymentError.current(),
         }).render(`#${buttonsContainer.id}`)
           .then(() => setReady(true))
-          .catch(() => setError(true))
-      } catch {
-        setError(true)
+          .catch((reason) => showPaymentError.current(reason))
+      } catch (reason) {
+        showPaymentError.current(reason)
       }
     }
 
     if (window.paypal && (!window.paypalSdkClientId || window.paypalSdkClientId === clientId)) {
       showButtons()
     } else if (!clientId.trim()) {
-      setError(true)
+      showPaymentError.current()
     } else {
       const previousScript = document.querySelector<HTMLScriptElement>(
         'script[data-payment-provider="paypal"]',
@@ -98,7 +110,7 @@ export function PayPalCheckout({ orderId, capability, clientId = '', onCaptured 
         window.paypalSdkClientId = clientId
         showButtons()
       }
-      script.onerror = () => setError(true)
+      script.onerror = () => showPaymentError.current()
       document.head.append(script)
     }
 
@@ -113,7 +125,7 @@ export function PayPalCheckout({ orderId, capability, clientId = '', onCaptured 
     <div className="payment-checkout">
       {!ready && !error && <p role="status">{t('paymentLoading')}</p>}
       <div id={`paypal-buttons-${orderId}`} ref={container} />
-      {error && <p role="alert">{t('paymentFailedRetry')}</p>}
+      {error && <p role="alert">{error}</p>}
     </div>
   )
 }

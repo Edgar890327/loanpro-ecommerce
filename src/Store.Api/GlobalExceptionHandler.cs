@@ -69,6 +69,7 @@ public sealed class GlobalExceptionHandler(
             Status = StatusCodes.Status500InternalServerError,
             Title = "An unexpected error occurred."
         };
+        problem.Extensions["code"] = "unexpected_error";
         problem.Extensions["correlationId"] = correlationId;
 
         httpContext.Response.StatusCode = problem.Status.Value;

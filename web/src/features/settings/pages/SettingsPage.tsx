@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { apiRequest } from '../../../shared/api/api'
+import { apiRequest, translateApiError } from '../../../shared/api/api'
 import { useAuth } from '../../../shared/auth/auth-context'
 import type { StoreSettings, SettingSchema } from '../types/StoreSettings'
+import { LoadingSkeleton } from '../../../components/atoms/LoadingSkeleton'
 
 type Draft = {
   publicConfiguration: Record<string, string>
@@ -18,8 +19,10 @@ export function SettingsPage() {
     queryFn: () => apiRequest<StoreSettings>('/api/admin/settings', token),
   })
 
-  if (settings.isLoading) return <p role="status">{t('loading')}</p>
-  if (settings.isError) return <section className="panel"><p role="alert">{t('settingsLoadFailed')}</p></section>
+  if (settings.isLoading) return <LoadingSkeleton rows={5} />
+  if (settings.isError) {
+    return <section className="panel"><p role="alert">{translateApiError(settings.error, t, 'settingsLoadFailed')}</p></section>
+  }
   if (!settings.data) return <section className="panel"><p role="alert">{t('settingsLoadFailed')}</p></section>
 
   return (
@@ -115,7 +118,7 @@ function SettingsEditor({
         />
         {t('settingEnabled')}
       </label>
-      {save.isError && <p role="alert">{t('settingsSaveFailed')}</p>}
+      {save.isError && <p role="alert">{translateApiError(save.error, t, 'settingsSaveFailed')}</p>}
       {save.isSuccess && <p role="status">{t('settingsSaved')}</p>}
       <div className="form-actions">
         <button type="submit" disabled={save.isPending}>{t('savePaymentSettings')}</button>

@@ -65,12 +65,13 @@ public static class PaymentEndpoints
         {
             PaymentOutcome.Created or PaymentOutcome.Existing =>
                 Results.Ok(ToResponse(result.Creation!)),
-            PaymentOutcome.Expired => Conflict("Reservation expired", "The reservation expired before payment could be created."),
-            PaymentOutcome.AlreadyFinalized => Conflict("Order is no longer payable", "Only a reserved order can be paid."),
+            PaymentOutcome.Expired => Conflict("reservation_expired", "Reservation expired", "The reservation expired before payment could be created."),
+            PaymentOutcome.AlreadyFinalized => Conflict("order_not_payable", "Order is no longer payable", "Only a reserved order can be paid."),
             PaymentOutcome.ProviderUnavailable => Results.Problem(
                 statusCode: StatusCodes.Status502BadGateway,
                 title: "Payment provider unavailable",
-                detail: "The payment could not be initialized. Retry the request."),
+                detail: "The payment could not be initialized. Retry the request.",
+                extensions: new Dictionary<string, object?> { ["code"] = "payment_provider_unavailable" }),
             PaymentOutcome.InvalidCapability => Results.NotFound(),
             _ => Results.NotFound()
         };
@@ -101,16 +102,18 @@ public static class PaymentEndpoints
         {
             PaymentOutcome.Approved or PaymentOutcome.Failed or PaymentOutcome.Pending =>
                 Results.Ok(ToResponse(result.Capture!)),
-            PaymentOutcome.Expired => Conflict("Reservation expired", "The reservation expired before payment could be captured."),
-            PaymentOutcome.AlreadyFinalized => Conflict("Order is no longer payable", "Only a reserved order can be captured."),
+            PaymentOutcome.Expired => Conflict("reservation_expired", "Reservation expired", "The reservation expired before payment could be captured."),
+            PaymentOutcome.AlreadyFinalized => Conflict("order_not_payable", "Order is no longer payable", "Only a reserved order can be captured."),
             PaymentOutcome.ProviderResponseInvalid => Results.Problem(
                 statusCode: StatusCodes.Status502BadGateway,
                 title: "Invalid payment response",
-                detail: "The payment provider response did not match the expected order total and currency."),
+                detail: "The payment provider response did not match the expected order total and currency.",
+                extensions: new Dictionary<string, object?> { ["code"] = "payment_response_invalid" }),
             PaymentOutcome.ProviderUnavailable => Results.Problem(
                 statusCode: StatusCodes.Status502BadGateway,
                 title: "Payment provider unavailable",
-                detail: "The payment could not be captured. Retry the request."),
+                detail: "The payment could not be captured. Retry the request.",
+                extensions: new Dictionary<string, object?> { ["code"] = "payment_provider_unavailable" }),
             PaymentOutcome.InvalidCapability or PaymentOutcome.NotFound => Results.NotFound(),
             _ => Results.NotFound()
         };
@@ -137,10 +140,15 @@ public static class PaymentEndpoints
     private static PaymentCaptureResponse ToResponse(PaymentCaptureView view) =>
         new(view.OrderId, view.OrderState, view.PaymentStatus.ToString());
 
-    private static IResult Conflict(string title, string detail) => Results.Conflict(new ProblemDetails
+    private static IResult Conflict(string code, string title, string detail)
     {
-        Status = StatusCodes.Status409Conflict,
-        Title = title,
-        Detail = detail
-    });
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status409Conflict,
+            Title = title,
+            Detail = detail
+        };
+        problem.Extensions["code"] = code;
+        return Results.Conflict(problem);
+    }
 }

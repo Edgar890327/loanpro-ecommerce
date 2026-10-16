@@ -66,6 +66,9 @@ public sealed class ProductAdminEndpointTests(PostgreSqlFixture fixture) : IClas
             "/api/admin/products",
             CreateProduct("Duplicate", "  kettle-01 "));
         Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
+        using var duplicateProblem = await JsonDocument.ParseAsync(
+            await duplicateResponse.Content.ReadAsStreamAsync());
+        Assert.Equal("duplicate_sku", duplicateProblem.RootElement.GetProperty("code").GetString());
 
         using var listResponse = await client.GetAsync("/api/admin/products?page=1&pageSize=10");
         var page = await listResponse.Content.ReadFromJsonAsync<PagedResponse<ProductResponse>>();
@@ -92,6 +95,9 @@ public sealed class ProductAdminEndpointTests(PostgreSqlFixture fixture) : IClas
         using var conflict = await JsonDocument.ParseAsync(
             await staleResponse.Content.ReadAsStreamAsync());
         Assert.Equal("Product was modified", conflict.RootElement.GetProperty("title").GetString());
+        Assert.Equal(
+            "product_concurrency_conflict",
+            conflict.RootElement.GetProperty("code").GetString());
 
         using var deleteResponse = await client.DeleteAsync($"/api/admin/products/{created.Id}");
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
@@ -136,6 +142,56 @@ public sealed class ProductAdminEndpointTests(PostgreSqlFixture fixture) : IClas
         var page = await response.Content.ReadFromJsonAsync<ErrorLogPage>();
         Assert.Equal(1, page!.TotalCount);
         Assert.Equal("correlation-match", Assert.Single(page.Items).CorrelationId);
+    }
+
+    [Fact]
+    public async Task OrderHistoryEndpoint_RequiresAdminAndListsOrderStateAndPaymentProvider()
+    {
+        using var factory = new TestApiFactory(fixture);
+        using var client = factory.CreateClient();
+
+        using (var unauthorized = await client.GetAsync("/api/admin/orders"))
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+        }
+
+        var order = new Order(
+            Guid.NewGuid().ToString("N"),
+            Guid.NewGuid().ToString("N"),
+            "History customer",
+            "history@example.test",
+            "1 Test Street",
+            Array.Empty<OrderItem>(),
+            3.50m,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddMinutes(15));
+        Assert.True(order.MarkPaid(DateTime.UtcNow));
+        var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<StoreDbContext>>();
+        await using (var database = await contextFactory.CreateDbContextAsync())
+        {
+            database.Orders.Add(order);
+            database.Payments.Add(new Payment(
+                order.Id,
+                "simulated",
+                Guid.NewGuid().ToString("N"),
+                "Approved",
+                order.Total,
+                DateTime.UtcNow));
+            await database.SaveChangesAsync();
+        }
+
+        await SignInAsync(client, factory.AdminPassword);
+        using var response = await client.GetAsync("/api/admin/orders?page=1&pageSize=10");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        var matchingOrder = body.RootElement.GetProperty("items")
+            .EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == order.Id);
+
+        Assert.Equal("Paid", matchingOrder.GetProperty("state").GetString());
+        Assert.Equal(3.50m, matchingOrder.GetProperty("shipping").GetDecimal());
+        Assert.Equal(3.50m, matchingOrder.GetProperty("total").GetDecimal());
+        Assert.Equal("simulated", matchingOrder.GetProperty("paymentProviderKey").GetString());
     }
 
     [Fact]

@@ -15,6 +15,10 @@ import { CheckoutPage } from '../features/cart/pages/CheckoutPage'
 import { OrderStatusPage } from '../features/cart/pages/OrderStatusPage'
 import { SettingsPage } from '../features/settings/pages/SettingsPage'
 import { CartProvider } from '../features/cart/state/CartProvider'
+import { GlobalErrorBoundary } from './GlobalErrorBoundary'
+import { NotificationProvider } from '../shared/notifications/NotificationProvider'
+import { OrderHistoryPage } from '../features/orders/pages/OrderHistoryPage'
+import { ErrorLogPage } from '../features/errors/pages/ErrorLogPage'
 
 const queryClient = new QueryClient()
 
@@ -39,6 +43,8 @@ const router = createBrowserRouter([
           { path: 'products/:id/edit', element: <ProductFormPage /> },
           { path: 'payments', element: <SettingsPage /> },
           { path: 'settings', element: <SettingsPage /> },
+          { path: 'orders', element: <OrderHistoryPage /> },
+          { path: 'error-logs', element: <ErrorLogPage /> },
         ],
       },
       {
@@ -54,7 +60,11 @@ export default function App() {
     <AuthProvider>
       <CartProvider>
         <QueryClientProvider client={queryClient}>
-          <RouterProvider router={router} />
+          <NotificationProvider>
+            <GlobalErrorBoundary>
+              <RouterProvider router={router} />
+            </GlobalErrorBoundary>
+          </NotificationProvider>
         </QueryClientProvider>
       </CartProvider>
     </AuthProvider>

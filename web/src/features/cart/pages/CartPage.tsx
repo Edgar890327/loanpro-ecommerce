@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { apiRequest } from '../../../shared/api/api'
+import { apiRequest, translateApiError } from '../../../shared/api/api'
 import { useCart } from '../state/useCart'
 import type { CartValidation } from '../types/CartValidation'
+import { formatCurrency } from '../../../shared/i18n/format'
+import { LoadingSkeleton } from '../../../components/atoms/LoadingSkeleton'
 
 export function CartPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { items, setQuantity, removeProduct, updateAvailability } = useCart()
   const [stockChanged, setStockChanged] = useState(false)
   const validation = useQuery({
@@ -45,8 +47,8 @@ export function CartPage() {
   return (
     <section className="panel cart-page">
       <h1>{t('cartTitle')}</h1>
-      {validation.isLoading && <p role="status">{t('loading')}</p>}
-      {validation.isError && <p role="alert">{t('cartValidationFailed')}</p>}
+      {validation.isLoading && <LoadingSkeleton rows={3} />}
+      {validation.isError && <p role="alert">{translateApiError(validation.error, t, 'cartValidationFailed')}</p>}
       {(unavailable.length > 0 || stockChanged) && <p role="alert">{t('stockChanged')}</p>}
       <div className="cart-lines">
         {items.map((item) => {
@@ -58,7 +60,7 @@ export function CartPage() {
               <div>
                 <h2>{item.name}</h2>
                 <p>{item.sku}</p>
-                <p>${(currentLine?.subtotal ?? item.price * item.quantity).toFixed(2)}</p>
+                <p>{formatCurrency(currentLine?.subtotal ?? item.price * item.quantity, i18n.language)}</p>
                 {issue && <p className="form-error">{t('stockAvailable', { count: issue.available })}</p>}
               </div>
               <label>
@@ -79,9 +81,9 @@ export function CartPage() {
         })}
       </div>
       <dl className="order-totals">
-        <div><dt>{t('subtotal')}</dt><dd>${subtotal.toFixed(2)}</dd></div>
-        <div><dt>{t('shipping')}</dt><dd>${shipping.toFixed(2)}</dd></div>
-        <div><dt>{t('total')}</dt><dd>${(subtotal + shipping).toFixed(2)}</dd></div>
+        <div><dt>{t('subtotal')}</dt><dd>{formatCurrency(subtotal, i18n.language)}</dd></div>
+        <div><dt>{t('shipping')}</dt><dd>{formatCurrency(shipping, i18n.language)}</dd></div>
+        <div><dt>{t('total')}</dt><dd>{formatCurrency(subtotal + shipping, i18n.language)}</dd></div>
       </dl>
       <Link
         className="primary-button"

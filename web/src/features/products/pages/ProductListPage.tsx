@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ApiError, apiRequest } from '../../../shared/api/api'
+import { ApiError, apiRequest, translateApiError } from '../../../shared/api/api'
 import { useAuth } from '../../../shared/auth/auth-context'
+import { LoadingSkeleton } from '../../../components/atoms/LoadingSkeleton'
+import { formatCurrency } from '../../../shared/i18n/format'
 import type { ProductPageData } from '../types/ProductPageData'
 
 export function ProductListPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { token } = useAuth()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
@@ -30,8 +32,8 @@ export function ProductListPage() {
           <Link className="primary-button" to="/admin/products/new">{t('addProduct')}</Link>
         </div>
       </div>
-      {products.isLoading && <p>{t('loading')}</p>}
-      {products.isError && <p role="alert">{t('failedToLoad')}</p>}
+      {products.isLoading && <LoadingSkeleton rows={5} />}
+      {products.isError && <p role="alert">{translateApiError(products.error, t, 'failedToLoad')}</p>}
       {removeProduct.isError && <p role="alert">{getMutationError(removeProduct.error, t)}</p>}
       {products.data?.items.length === 0 && <p>{t('noProducts')}</p>}
       {products.data && products.data.items.length > 0 && (
@@ -44,7 +46,7 @@ export function ProductListPage() {
                   <th>{t('sku')}</th>
                   <th>{t('category')}</th>
                   <th>{t('price')}</th>
-                  <th>{t('stock')}</th>
+                  <th>{t('availableStock')}</th>
                   <th>{t('actions')}</th>
                 </tr>
               </thead>
@@ -54,8 +56,12 @@ export function ProductListPage() {
                     <td>{product.name}</td>
                     <td>{product.sku}</td>
                     <td>{product.category}</td>
-                    <td>{product.price.toFixed(2)}</td>
-                    <td>{product.stock}</td>
+                    <td>{formatCurrency(product.price, i18n.language)}</td>
+                    <td>
+                      {product.availableStock <= 5
+                        ? <span className="low-stock-indicator">{t('lowStockIndicator', { count: product.availableStock })}</span>
+                        : product.availableStock}
+                    </td>
                     <td className="row-actions">
                       <Link to={`/admin/products/${product.id}/edit`}>{t('edit')}</Link>
                       <button
@@ -73,22 +79,23 @@ export function ProductListPage() {
               </tbody>
             </table>
           </div>
-          <div className="pagination">
+          <nav className="pagination" aria-label={t('pagination')}>
             <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
               {t('previous')}
             </button>
-            <span>{t('page', { page, pages })}</span>
+            <span aria-current="page">{t('page', { page, pages })}</span>
             <button type="button" disabled={page >= pages} onClick={() => setPage((current) => current + 1)}>
               {t('next')}
             </button>
-          </div>
+          </nav>
         </>
       )}
     </section>
   )
 }
 
-function getMutationError(error: Error, t: (key: string) => string) {
+function getMutationError(error: Error, t: (key: string, options?: Record<string, unknown>) => string) {
+  if (error instanceof ApiError && error.code) return translateApiError(error, t)
   if (error instanceof ApiError && error.status === 409) return t('conflict')
   return t('requestFailed')
 }

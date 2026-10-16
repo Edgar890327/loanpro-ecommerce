@@ -11,6 +11,7 @@ export function Layout() {
   return (
     <div className="app-shell">
       <header className="site-header">
+        <a className="skip-link" href="#main-content">{t('skipToContent')}</a>
         <Link className="brand" to="/" aria-label={t('storeHome')}>
           Store
         </Link>
@@ -19,11 +20,13 @@ export function Layout() {
           <Link to="/cart">{t('cart')} ({items.reduce((count, item) => count + item.quantity, 0)})</Link>
           {token && <Link to="/admin/products">{t('products')}</Link>}
           {token && <Link to="/admin/settings">{t('settingsTitle')}</Link>}
+          {token && <Link to="/admin/orders">{t('orderHistory')}</Link>}
+          {token && <Link to="/admin/error-logs">{t('errorLogs')}</Link>}
         </nav>
         {token
           ? <button className="text-button" type="button" onClick={signOut}>{t('logout')}</button>
           : <Link to="/login">{t('login')}</Link>}
-        <div className="language-switcher" aria-label={t('language')}>
+        <div className="language-switcher" role="group" aria-label={t('language')}>
           <button
             type="button"
             aria-pressed={i18n.language === 'en-US'}
@@ -40,7 +43,7 @@ export function Layout() {
           </button>
         </div>
       </header>
-      <main className="page-content">
+      <main id="main-content" className="page-content" tabIndex={-1}>
         <Outlet />
       </main>
     </div>

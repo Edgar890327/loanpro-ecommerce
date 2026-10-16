@@ -55,6 +55,7 @@ public static class DependencyInjection
             provider => provider.GetRequiredService<ShippingStrategyRegistry>());
         services.AddScoped<IShippingQuoteService, ShippingQuoteService>();
         services.AddScoped<IOrderService, OrderService>();
+        services.AddScoped<IOrderHistoryReader, OrderHistoryReader>();
         var reservationTtlSeconds = configuration.GetValue<int?>("RESERVATION_TTL_SECONDS");
         var reservationTtlMinutes = configuration.GetValue<int>("RESERVATION_TTL_MINUTES", 15);
         var reservationOptions = new ReservationOptions

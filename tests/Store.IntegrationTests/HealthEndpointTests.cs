@@ -62,6 +62,9 @@ public sealed class HealthEndpointTests(PostgreSqlFixture fixture) : IClassFixtu
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
             Assert.Equal(correlationId, response.Headers.GetValues("X-Correlation-ID").Single());
             Assert.Equal(
+                "unexpected_error",
+                problem.RootElement.GetProperty("code").GetString());
+            Assert.Equal(
                 correlationId,
                 problem.RootElement.GetProperty("correlationId").GetString());
 

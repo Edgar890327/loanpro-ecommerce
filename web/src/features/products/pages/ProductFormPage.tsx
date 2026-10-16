@@ -3,13 +3,14 @@ import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ApiError, apiRequest } from '../../../shared/api/api'
+import { ApiError, apiRequest, translateApiError } from '../../../shared/api/api'
 import { useAuth } from '../../../shared/auth/auth-context'
 import { validateProductForm } from '../../../shared/validation/productValidation'
 import { NumberField } from '../../../components/molecules/NumberField'
 import { TextField } from '../../../components/molecules/TextField'
 import type { Product } from '../types/Product'
 import type { ProductInput } from '../types/ProductInput'
+import { LoadingSkeleton } from '../../../components/atoms/LoadingSkeleton'
 
 type ProductErrors = Partial<Record<'name' | 'sku' | 'category' | 'price' | 'stock' | 'weightKg', string>>
 
@@ -62,7 +63,9 @@ export function ProductFormPage() {
       navigate('/admin/products')
     },
     onError: (error: Error) => {
-      setFormError(error instanceof ApiError && error.status === 409
+      setFormError(error instanceof ApiError && error.code
+        ? translateApiError(error, t)
+        : error instanceof ApiError && error.status === 409
         ? error.detail?.includes('SKU')
           ? t('duplicateSku')
           : error.title === 'Stock is reserved'
@@ -91,8 +94,10 @@ export function ProductFormPage() {
     if (Object.keys(validation).length === 0) saveProduct.mutate(values)
   }
 
-  if (id && existing.isLoading) return <p>{t('loading')}</p>
-  if (id && existing.isError) return <p role="alert">{t('failedToLoad')}</p>
+  if (id && existing.isLoading) return <LoadingSkeleton rows={6} />
+  if (id && existing.isError) {
+    return <p role="alert">{translateApiError(existing.error, t, 'failedToLoad')}</p>
+  }
 
   return (
     <section className="panel form-panel">

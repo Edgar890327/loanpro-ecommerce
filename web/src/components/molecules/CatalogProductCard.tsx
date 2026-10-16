@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { StockBadge } from '../atoms/StockBadge'
+import { formatCurrency } from '../../shared/i18n/format'
 
 type CatalogProductCardProps = {
   product: {
@@ -14,7 +15,7 @@ type CatalogProductCardProps = {
 }
 
 export function CatalogProductCard({ product }: CatalogProductCardProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [searchParams] = useSearchParams()
 
   return (
@@ -33,7 +34,7 @@ export function CatalogProductCard({ product }: CatalogProductCardProps) {
       </h2>
       <p>{product.description}</p>
       <div className="catalog-card-bottom">
-        <strong>${product.price.toFixed(2)}</strong>
+        <strong>{formatCurrency(product.price, i18n.language)}</strong>
         <span>{t('stockCount', { count: product.stock })}</span>
       </div>
     </article>

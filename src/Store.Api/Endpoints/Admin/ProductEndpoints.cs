@@ -113,24 +113,30 @@ public static class ProductEndpoints
         return result == ProductAdminOutcome.NotFound ? Results.NotFound() : Results.NoContent();
     }
 
-    private static IResult DuplicateSku() => Results.Conflict(new ProblemDetails
-    {
-        Status = StatusCodes.Status409Conflict,
-        Title = "SKU already exists",
-        Detail = "A product with this normalized SKU already exists."
-    });
+    private static IResult DuplicateSku() => Conflict(
+        "duplicate_sku",
+        "SKU already exists",
+        "A product with this normalized SKU already exists.");
 
-    private static IResult ConcurrencyConflict() => Results.Conflict(new ProblemDetails
-    {
-        Status = StatusCodes.Status409Conflict,
-        Title = "Product was modified",
-        Detail = "This product changed after it was loaded. Refresh it and reapply your changes."
-    });
+    private static IResult ConcurrencyConflict() => Conflict(
+        "product_concurrency_conflict",
+        "Product was modified",
+        "This product changed after it was loaded. Refresh it and reapply your changes.");
 
-    private static IResult ReservedStockConflict() => Results.Conflict(new ProblemDetails
+    private static IResult ReservedStockConflict() => Conflict(
+        "reserved_stock_conflict",
+        "Stock is reserved",
+        "Stock cannot be reduced below the quantity currently reserved by active orders.");
+
+    private static IResult Conflict(string code, string title, string detail)
     {
-        Status = StatusCodes.Status409Conflict,
-        Title = "Stock is reserved",
-        Detail = "Stock cannot be reduced below the quantity currently reserved by active orders."
-    });
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status409Conflict,
+            Title = title,
+            Detail = detail
+        };
+        problem.Extensions["code"] = code;
+        return Results.Conflict(problem);
+    }
 }

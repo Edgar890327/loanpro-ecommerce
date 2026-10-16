@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { apiRequest } from '../../../shared/api/api'
+import { apiRequest, translateApiError } from '../../../shared/api/api'
 import { CatalogProductCard } from '../../../components/molecules/CatalogProductCard'
 import { CatalogFilters } from '../../../components/organisms/CatalogFilters'
+import { LoadingSkeleton } from '../../../components/atoms/LoadingSkeleton'
 import type { CatalogPageData } from '../types/CatalogPageData'
 import type { CatalogCategory } from '../types/CatalogCategory'
 
@@ -92,9 +93,9 @@ export function PublicCatalogPage() {
         onFilterChange={updateFilter}
       />
 
-      {catalogQuery.isLoading && <p role="status">{t('loading')}</p>}
-      {catalogQuery.isError && <p role="alert">{t('catalogLoadError')}</p>}
-      {categories.isError && <p role="alert">{t('categoriesLoadError')}</p>}
+      {catalogQuery.isLoading && <LoadingSkeleton rows={6} />}
+      {catalogQuery.isError && <p role="alert">{translateApiError(catalogQuery.error, t, 'catalogLoadError')}</p>}
+      {categories.isError && <p role="alert">{translateApiError(categories.error, t, 'categoriesLoadError')}</p>}
       {catalogQuery.data?.items.length === 0 && <p role="status">{t('emptyCatalog')}</p>}
       {catalogQuery.data && catalogQuery.data.items.length > 0 && (
         <>
@@ -103,7 +104,7 @@ export function PublicCatalogPage() {
               <CatalogProductCard key={product.id} product={product} />
             ))}
           </div>
-          <div className="pagination">
+          <nav className="pagination" aria-label={t('pagination')}>
             <button
               type="button"
               disabled={page <= 1}
@@ -111,7 +112,7 @@ export function PublicCatalogPage() {
             >
               {t('previous')}
             </button>
-            <span>{t('page', { page, pages })}</span>
+            <span aria-current="page">{t('page', { page, pages })}</span>
             <button
               type="button"
               disabled={page >= pages}
@@ -119,7 +120,7 @@ export function PublicCatalogPage() {
             >
               {t('next')}
             </button>
-          </div>
+          </nav>
         </>
       )}
     </section>

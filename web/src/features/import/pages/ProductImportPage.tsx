@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ApiError, apiRequest } from '../../../shared/api/api'
+import { ApiError, apiRequest, translateApiError } from '../../../shared/api/api'
 import { useAuth } from '../../../shared/auth/auth-context'
 import { ImportReportView } from '../../../components/organisms/ImportReportView'
 import type { ImportReport } from '../types/ImportReport'
+import { formatDate } from '../../../shared/i18n/format'
 
 type ImportAction = {
   file: File
@@ -14,7 +15,7 @@ type ImportAction = {
 }
 
 export function ProductImportPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { token } = useAuth()
   const queryClient = useQueryClient()
   const [file, setFile] = useState<File | null>(null)
@@ -52,7 +53,7 @@ export function ProductImportPage() {
         return
       }
 
-      setRequestError(t('importRequestFailed'))
+      setRequestError(translateApiError(error, t, 'importRequestFailed'))
     },
   })
 
@@ -133,7 +134,7 @@ export function ProductImportPage() {
         <div className="import-warning" role="alert">
           <p>{t('importReimportWarning', {
             date: report?.previousImportAtUtc
-              ? ` ${new Date(report.previousImportAtUtc).toLocaleString()}`
+              ? ` ${formatDate(report.previousImportAtUtc, i18n.language)}`
               : '',
           })}</p>
           <label className="import-confirm">

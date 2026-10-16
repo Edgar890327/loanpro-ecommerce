@@ -33,6 +33,7 @@ describe('application shell', () => {
       'aria-pressed',
       'true',
     )
+    expect(window.localStorage.getItem('store-language')).toBe('es')
     expect(await screen.findByRole('heading', { name: 'Catálogo de productos' })).toBeInTheDocument()
   })
 })

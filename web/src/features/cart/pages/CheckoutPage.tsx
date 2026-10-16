@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useCart } from '../state/useCart'
-import { apiRequest } from '../../../shared/api/api'
+import { apiRequest, translateApiError } from '../../../shared/api/api'
+import { formatCurrency } from '../../../shared/i18n/format'
 import type { CartValidation } from '../types/CartValidation'
 import type { Order } from '../types/Order'
 
@@ -14,7 +15,7 @@ type ShippingQuote = {
 }
 
 export function CheckoutPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { items, clear } = useCart()
   const navigate = useNavigate()
   const idempotencyKey = useRef<string | null>(null)
@@ -83,8 +84,8 @@ export function CheckoutPage() {
       idempotencyKey.current = null
       clear()
       navigate(`/orders/${order.id}`)
-    } catch {
-      setError(t('checkoutFailed'))
+    } catch (error) {
+      setError(translateApiError(error, t, 'checkoutFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -99,7 +100,7 @@ export function CheckoutPage() {
         <label>{t('customerName')}<input required maxLength={200} value={customerName} onChange={(event) => setCustomerName(event.target.value)} /></label>
         <label>{t('customerEmail')}<input required type="email" maxLength={320} value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
         <label>{t('shippingAddress')}<textarea required maxLength={1000} value={shippingAddress} onChange={(event) => setShippingAddress(event.target.value)} /></label>
-        {quote && <p role="status">{t('shippingQuote', { amount: quote.shipping.toFixed(2) })}</p>}
+        {quote && <p role="status">{t('shippingQuote', { amount: formatCurrency(quote.shipping, i18n.language) })}</p>}
         {quoteError && <p role="alert">{t('shippingQuoteFailed')}</p>}
         {error && <p role="alert">{error}</p>}
         <button className="primary-button" type="submit" disabled={submitting}>
