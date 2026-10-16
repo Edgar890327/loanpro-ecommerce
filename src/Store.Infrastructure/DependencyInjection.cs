@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Store.Application;
+using Store.Infrastructure.Catalog;
 using Store.Infrastructure.ErrorLogging;
 using Store.Infrastructure.Importing;
 
@@ -23,8 +24,12 @@ public static class DependencyInjection
         }
 
         services.AddDbContextFactory<StoreDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddScoped<IDatabaseHealthReader, DatabaseHealthReader>();
+        services.AddScoped<IProductCatalogReader, ProductCatalogReader>();
+        services.AddScoped<IProductAdministration, Store.Infrastructure.Products.ProductAdministration>();
+        services.AddScoped<IErrorLogReader, ErrorLogReader>();
         services.AddSingleton<ProductCsvParser>();
-        services.AddScoped<ProductImportService>();
+        services.AddScoped<IProductImportService, ProductImportService>();
         var errorLogOptions = configuration.GetSection(ErrorLogOptions.SectionName)
             .Get<ErrorLogOptions>() ?? new ErrorLogOptions();
         var retentionDays = configuration.GetValue<int?>("ERROR_LOG_RETENTION_DAYS");

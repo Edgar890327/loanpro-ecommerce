@@ -12,7 +12,7 @@ namespace Store.Infrastructure.Importing;
 public sealed class ProductImportService(
     IDbContextFactory<StoreDbContext> contextFactory,
     ProductCsvParser parser,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider) : IProductImportService
 {
     public async Task<ProductImportResult> ImportAsync(
         byte[] fileBytes,

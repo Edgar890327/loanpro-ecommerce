@@ -5,6 +5,7 @@ using Serilog;
 using Store.Api;
 using Store.Api.Admin;
 using Store.Api.Auth;
+using Store.Application;
 using Store.Infrastructure;
 using System.Text;
 
@@ -88,9 +89,9 @@ app.UseSwaggerUI();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.MapGet("/health", async (StoreDbContext database, CancellationToken cancellationToken) =>
+app.MapGet("/health", async (IDatabaseHealthReader databaseHealth, CancellationToken cancellationToken) =>
 {
-    var databaseIsAvailable = await database.Database.CanConnectAsync(cancellationToken);
+    var databaseIsAvailable = await databaseHealth.IsAvailableAsync(cancellationToken);
 
     return databaseIsAvailable
         ? Results.Ok(new { status = "Healthy" })

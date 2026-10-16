@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Store.Api;
+using Store.Application;
 using Store.Domain;
 using Store.Infrastructure;
 
