@@ -12,7 +12,11 @@ public sealed class Product
 
     public string SkuNormalized { get; private set; } = string.Empty;
 
+    public string NameNormalized { get; private set; } = string.Empty;
+
     public string Description { get; private set; } = string.Empty;
+
+    public string SearchText { get; private set; } = string.Empty;
 
     public Guid CategoryId { get; private set; }
 
@@ -64,9 +68,11 @@ public sealed class Product
         DateTime nowUtc)
     {
         Name = name.Trim();
+        NameNormalized = ProductTextNormalizer.Normalize(Name);
         Sku = sku.Trim();
         SkuNormalized = SkuNormalizer.Normalize(sku);
         Description = description.Trim();
+        SearchText = ProductTextNormalizer.BuildSearchText(Name, Sku, Description);
         Category = category;
         CategoryId = category.Id;
         Price = price;

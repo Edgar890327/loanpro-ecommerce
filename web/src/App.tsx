@@ -5,25 +5,16 @@ import { AuthProvider, ProtectedRoute } from './auth'
 import { Layout } from './Layout'
 import { LoginPage } from './LoginPage'
 import { ProductFormPage, ProductListPage } from './ProductPages'
+import { PublicCatalogPage, PublicProductDetailPage } from './PublicCatalogPages'
 
 const queryClient = new QueryClient()
-
-function HomePage() {
-  const { t } = useTranslation()
-  return (
-    <section className="welcome-panel">
-      <p className="eyebrow">{t('welcomeEyebrow')}</p>
-      <h1>{t('welcomeTitle')}</h1>
-      <p>{t('welcomeBody')}</p>
-    </section>
-  )
-}
 
 const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
-      { path: '/', element: <HomePage /> },
+      { path: '/', element: <PublicCatalogPage /> },
+      { path: '/products/:id', element: <PublicProductDetailPage /> },
       { path: '/login', element: <LoginPage /> },
       {
         path: '/admin',

@@ -13,6 +13,9 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasPostgresExtension("pg_trgm");
+        modelBuilder.HasPostgresExtension("unaccent");
+
         modelBuilder.Entity<Category>(entity =>
         {
             entity.ToTable("Categories");
@@ -29,7 +32,9 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
             entity.Property(product => product.Name).HasMaxLength(200).IsRequired();
             entity.Property(product => product.Sku).HasMaxLength(64).IsRequired();
             entity.Property(product => product.SkuNormalized).HasMaxLength(64).IsRequired();
+            entity.Property(product => product.NameNormalized).HasMaxLength(200).IsRequired();
             entity.Property(product => product.Description).HasMaxLength(2000).IsRequired();
+            entity.Property(product => product.SearchText).HasMaxLength(2300).IsRequired();
             entity.Property(product => product.Price).HasPrecision(12, 2).IsRequired();
             entity.Property(product => product.Stock).IsRequired();
             entity.Property(product => product.WeightKg).HasPrecision(12, 3);
@@ -42,6 +47,9 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
                 .IsRowVersion();
             entity.HasIndex(product => product.SkuNormalized).IsUnique();
             entity.HasIndex(product => product.CategoryId);
+            entity.HasIndex(product => product.SearchText)
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
             entity.HasQueryFilter(product => !product.IsDeleted);
             entity.HasOne(product => product.Category)
                 .WithMany(category => category.Products)
