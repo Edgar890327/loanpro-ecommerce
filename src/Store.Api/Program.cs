@@ -13,16 +13,21 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}"));
 
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
+app.UseRouting();
 app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseExceptionHandler();
-app.UseStatusCodePages();
 app.UseSerilogRequestLogging();
+app.UseExceptionHandler(new ExceptionHandlerOptions
+{
+    SuppressDiagnosticsCallback = _ => true
+});
+app.UseStatusCodePages();
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseDefaultFiles();
@@ -42,6 +47,13 @@ app.MapGet("/health", async (StoreDbContext database, CancellationToken cancella
 .WithName("Health");
 
 app.MapFallbackToFile("index.html");
+
+if (app.Environment.IsEnvironment("Testing"))
+{
+    app.MapPost(
+        "/test/throw",
+        (Func<IResult>)(() => throw new InvalidOperationException("private@example.com")));
+}
 
 await using (var scope = app.Services.CreateAsyncScope())
 {
