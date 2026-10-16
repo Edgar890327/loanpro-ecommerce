@@ -7,8 +7,48 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
 {
     public DbSet<ErrorLog> ErrorLogs => Set<ErrorLog>();
 
+    public DbSet<Category> Categories => Set<Category>();
+
+    public DbSet<Product> Products => Set<Product>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.ToTable("Categories");
+            entity.HasKey(category => category.Id);
+            entity.Property(category => category.Name).HasMaxLength(100).IsRequired();
+            entity.Property(category => category.NormalizedName).HasMaxLength(100).IsRequired();
+            entity.HasIndex(category => category.NormalizedName).IsUnique();
+        });
+
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.ToTable("Products");
+            entity.HasKey(product => product.Id);
+            entity.Property(product => product.Name).HasMaxLength(200).IsRequired();
+            entity.Property(product => product.Sku).HasMaxLength(64).IsRequired();
+            entity.Property(product => product.SkuNormalized).HasMaxLength(64).IsRequired();
+            entity.Property(product => product.Description).HasMaxLength(2000).IsRequired();
+            entity.Property(product => product.Price).HasPrecision(12, 2).IsRequired();
+            entity.Property(product => product.Stock).IsRequired();
+            entity.Property(product => product.WeightKg).HasPrecision(12, 3);
+            entity.Property(product => product.IsDeleted).IsRequired();
+            entity.Property(product => product.CreatedAtUtc).IsRequired();
+            entity.Property(product => product.UpdatedAtUtc).IsRequired();
+            entity.Property<uint>("xmin")
+                .HasField("xmin")
+                .UsePropertyAccessMode(PropertyAccessMode.Field)
+                .IsRowVersion();
+            entity.HasIndex(product => product.SkuNormalized).IsUnique();
+            entity.HasIndex(product => product.CategoryId);
+            entity.HasQueryFilter(product => !product.IsDeleted);
+            entity.HasOne(product => product.Category)
+                .WithMany(category => category.Products)
+                .HasForeignKey(product => product.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<ErrorLog>(entity =>
         {
             entity.ToTable("ErrorLog");

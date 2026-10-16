@@ -1,6 +1,6 @@
 # LoanPro E-Commerce
 
-An enterprise e-commerce application foundation built with .NET 10, PostgreSQL, and React. This milestone adds asynchronous, persistent error logging to the runnable application shell; product, import, checkout, and payment business logic are intentionally not included yet.
+An enterprise e-commerce application built with .NET 10, PostgreSQL, and React. This milestone adds JWT-protected product administration and read-only error-log queries alongside asynchronous persistent error logging; import, checkout, and payment business logic remain for later milestones.
 
 ## Requirements
 
@@ -41,16 +41,18 @@ In another terminal from the repository root, configure the local database conne
 
 ```sh
 export ConnectionStrings__DefaultConnection='Host=localhost;Port=5432;Database=store;Username=store;Password=store-local-only'
+export ADMIN_PASSWORD='replace-before-use'
+export JWT_SECRET='replace-with-a-random-secret-of-at-least-32-characters'
 export ASPNETCORE_URLS=http://localhost:8080
 dotnet run --project src/Store.Api/Store.Api.csproj --no-launch-profile
 ```
 
-Vite serves the development UI (normally at <http://localhost:5173>); the API and Swagger UI are available at port 8080. `ERROR_LOG_RETENTION_DAYS` controls how long error logs are retained and defaults to 30; the admin, JWT, and reservation settings apply to later application features.
+Vite serves the development UI (normally at <http://localhost:5173>); the API and Swagger UI are available at port 8080. `ERROR_LOG_RETENTION_DAYS` controls how long error logs are retained and defaults to 30. The admin login compares against `ADMIN_PASSWORD`; configure a random `JWT_SECRET` of at least 32 bytes. `JWT_EXPIRY_MINUTES` defaults to 15 and is limited to 1–60 minutes. `RESERVATION_TTL_MINUTES` applies to the later checkout milestone.
 
 ## Tests and quality checks
 
 ```sh
-dotnet test tests/Store.UnitTests/Store.UnitTests.csproj -p:CollectCoverage=true -p:Threshold=80 -p:ThresholdType=line -p:ThresholdStat=total -p:ExcludeByFile="**/Program.cs%2c**/StoreDbContextFactory.cs%2c**/Migrations/*.cs%2c**/EfCoreErrorLogBatchStore.cs"
+dotnet test tests/Store.UnitTests/Store.UnitTests.csproj -p:CollectCoverage=true -p:Threshold=80 -p:ThresholdType=line -p:ThresholdStat=total -p:ExcludeByFile="**/Program.cs%2c**/StoreDbContextFactory.cs%2c**/Migrations/*.cs%2c**/EfCoreErrorLogBatchStore.cs%2c**/ProductEndpoints.cs%2c**/ErrorLogEndpoints.cs%2c**/AuthEndpoints.cs"
 dotnet test tests/Store.IntegrationTests/Store.IntegrationTests.csproj
 cd web
 npm ci
@@ -59,19 +61,22 @@ npm run test:run
 npm run build
 ```
 
-The PostgreSQL integration tests use Testcontainers and require a working Docker daemon. The unit-test command enforces an 80% line-coverage threshold; it excludes the process entry point, design-time context factory, generated migrations, and the EF batch store whose database operations are covered by PostgreSQL integration tests. GitHub Actions runs the backend build, unit and PostgreSQL integration tests, frontend lint, frontend smoke test, and production frontend build.
+The PostgreSQL integration tests use Testcontainers and require a working Docker daemon. The unit-test command enforces an 80% line-coverage threshold; it excludes the process entry point, design-time context factory, generated migrations, the EF batch store, and HTTP endpoints covered by PostgreSQL integration tests. GitHub Actions runs the backend build, unit and PostgreSQL integration tests, frontend lint, frontend smoke test, and production frontend build.
 
 ## Architecture and decisions
 
 - The solution contains `Store.Domain`, `Store.Application`, `Store.Infrastructure`, and `Store.Api`, plus unit and integration test projects. `Application` depends on `Domain`; `Infrastructure` depends on `Application`. The API references `Application` and `Infrastructure`; its Infrastructure reference is limited to composition-root registration of the database.
 - Nullable reference types are enabled and compiler warnings are treated as errors repository-wide.
-- EF Core and Npgsql are wired through `StoreDbContext`. Migrations are applied automatically at API startup. The current migration set creates the error-log infrastructure table without introducing business tables.
+- EF Core and Npgsql are wired through `StoreDbContext`. Migrations are applied automatically at API startup. The catalog migration adds categories and products with decimal precision, a normalized unique SKU index, soft-delete filtering, and PostgreSQL `xmin` optimistic concurrency.
+- The admin API issues short-lived JWTs through `POST /auth/login`; the configured administrator password is checked using a fixed-time comparison. Product CRUD and the read-only `GET /api/admin/error-logs` endpoint require the Administrator authorization policy. Product writes validate names, SKU, category, price, stock, weight, and maximum field lengths in the Application layer.
+- SKU uniqueness uses a stored normalized key: trim surrounding whitespace and uppercase invariantly. Categories are shared by a similarly normalized name. Product updates submit the current `version` (`xmin`) and receive a clear 409 conflict if another update has already changed the row. Product deletion sets `IsDeleted` and never physically removes the product.
+- Admin error-log queries support UTC date bounds, level, correlation ID, and bounded page sizes. The React admin includes a bilingual login, route guard, paginated catalog, create/edit form, delete confirmation, automatic session removal and redirect on 401, and a translated conflict message for stale edits.
 - The API returns ProblemDetails for unhandled errors and non-success status codes, exposes `/health` with a PostgreSQL connectivity check, publishes Swagger UI, writes structured Serilog request logs, and assigns a GUID `X-Correlation-ID` to each request. A valid incoming correlation ID is preserved.
 - Unhandled exceptions return ProblemDetails with the correlation ID and enter a bounded in-memory `Channel<ErrorLog>`. A hosted worker writes logs to PostgreSQL in batches through independently created EF Core contexts; persistence failures are reported through Serilog without changing the request response. Error records contain a generic message and route template, not request bodies, authorization headers, query strings, exception messages, or raw paths. `ERROR_LOG_RETENTION_DAYS` controls background deletion of older entries and defaults to 30.
 - The `ErrorLog` table stores UTC timestamps, severity, correlation ID, exception type and stack trace, HTTP method, route template, status code, and optional order and payment-provider keys. Timestamp and correlation ID are indexed.
-- The frontend uses Vite, React, TypeScript, React Router, TanStack Query, and react-i18next. English (`en-US`) and Spanish (`es`) are configured without adding translated product content in this foundation milestone.
+- The frontend uses Vite, React, TypeScript, React Router, TanStack Query, and react-i18next. All admin UI text is available in English (`en-US`) and Spanish (`es`).
 - Docker uses separate frontend build, .NET publish, and ASP.NET runtime stages. Compose exposes the app on port 8080 and gates startup on PostgreSQL health. An end-to-end Compose profile is left for milestone 9 rather than adding placeholder test services now.
-- The currency, payment, shipping, inventory, catalog, and import policies remain for their respective implementation milestones; this scaffold does not introduce behavior or defaults for them.
+- The currency, payment, shipping, inventory, and import policies remain for their respective implementation milestones; this scaffold does not introduce behavior or defaults for them.
 
 ## Alternatives considered
 
@@ -80,3 +85,6 @@ The PostgreSQL integration tests use Testcontainers and require a working Docker
 - **Migration startup:** manual migration commands during deployment give operators more rollout control. Automatic migrations are used for this single-instance challenge setup so a fresh Compose deployment starts end to end; production multi-instance deployments should move migrations to a controlled deployment step.
 - **Database readiness:** retry loops in application code duplicate orchestration and complicate failure reporting. Compose health-gates API startup; API startup fails explicitly if the database or migration is unavailable.
 - **Error persistence:** a PostgreSQL Serilog sink is convenient for general-purpose log shipping, but it does not provide the application-specific error schema, bounded asynchronous handoff, or isolated batch writer required here. Writing errors through the request's primary `StoreDbContext` would couple logging success to request scope and database transactions; a channel-backed worker with its own contexts keeps persistence decoupled from request handling.
+- **Concurrency token:** an application-managed integer version would work across database providers, but PostgreSQL's `xmin` already changes on each row update and avoids maintaining a second counter. The API exposes it as an opaque unsigned `version` and uses it as EF Core's concurrency token.
+- **SKU uniqueness:** relying on PostgreSQL collation for case-insensitive comparison is locale-dependent, and trimming only on input does not prevent inconsistent stored values. A normalized invariant-uppercase key and unique index make case/outer-whitespace behavior explicit and portable.
+- **Admin authentication:** HTTP Basic authentication would resend the long-lived password on each request, while persisting admin credentials would introduce another secret store. A configured password exchanged once for a short-lived signed JWT keeps the challenge's single-admin setup small without storing the password in the database.

@@ -93,6 +93,156 @@ button {
   box-shadow: 0 1rem 2.5rem rgb(23 32 51 / 5%);
 }
 
+.panel {
+  padding: clamp(1.25rem, 3vw, 2rem);
+  background: #fff;
+  border: 1px solid #e5e9f0;
+  border-radius: 1rem;
+  box-shadow: 0 1rem 2.5rem rgb(23 32 51 / 5%);
+}
+
+.panel h1 {
+  margin: 0;
+}
+
+.page-heading,
+.form-actions,
+.pagination,
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.page-heading {
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.primary-button,
+.secondary-button,
+.pagination button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.7rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
+  font-weight: 650;
+}
+
+.primary-button {
+  color: #fff;
+  background: #1747a6;
+}
+
+.secondary-button,
+.pagination button {
+  color: #24324a;
+  background: #fff;
+  border-color: #cbd3e0;
+}
+
+.pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+th,
+td {
+  padding: 0.85rem 0.7rem;
+  border-bottom: 1px solid #e5e9f0;
+}
+
+th {
+  color: #4c5870;
+  font-size: 0.85rem;
+}
+
+.row-actions {
+  gap: 0.8rem;
+}
+
+.row-actions a {
+  color: #1747a6;
+  font-weight: 650;
+}
+
+.text-button {
+  padding: 0;
+  color: #1747a6;
+  background: transparent;
+  border: 0;
+}
+
+.danger-text {
+  color: #b42318;
+}
+
+.pagination {
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+
+.form-panel {
+  width: min(42rem, 100%);
+  margin: 0 auto;
+}
+
+.form-panel h1 {
+  margin-bottom: 1.5rem;
+}
+
+.form-panel form {
+  display: grid;
+  gap: 1rem;
+}
+
+.form-panel label {
+  display: grid;
+  gap: 0.4rem;
+  color: #344054;
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.form-panel input,
+.form-panel textarea {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  color: #172033;
+  background: #fff;
+  border: 1px solid #cbd3e0;
+  border-radius: 0.45rem;
+  font: inherit;
+}
+
+.form-panel textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.field-error,
+.form-error {
+  color: #b42318;
+  font-size: 0.88rem;
+}
+
+.form-actions {
+  margin-top: 0.5rem;
+}
+
 .welcome-panel h1 {
   margin: 0.5rem 0;
   font-size: clamp(2rem, 5vw, 3rem);

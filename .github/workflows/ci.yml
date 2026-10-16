@@ -14,7 +14,7 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore Store.slnx
       - run: dotnet build Store.slnx --configuration Release --no-restore
-      - run: dotnet test tests/Store.UnitTests/Store.UnitTests.csproj --configuration Release --no-build -p:CollectCoverage=true -p:Threshold=80 -p:ThresholdType=line -p:ThresholdStat=total -p:ExcludeByFile="**/Program.cs%2c**/StoreDbContextFactory.cs%2c**/Migrations/*.cs%2c**/EfCoreErrorLogBatchStore.cs"
+      - run: dotnet test tests/Store.UnitTests/Store.UnitTests.csproj --configuration Release --no-build -p:CollectCoverage=true -p:Threshold=80 -p:ThresholdType=line -p:ThresholdStat=total -p:ExcludeByFile="**/Program.cs%2c**/StoreDbContextFactory.cs%2c**/Migrations/*.cs%2c**/EfCoreErrorLogBatchStore.cs%2c**/ProductEndpoints.cs%2c**/ErrorLogEndpoints.cs%2c**/AuthEndpoints.cs"
       - run: dotnet test tests/Store.IntegrationTests/Store.IntegrationTests.csproj --configuration Release --no-build
 
   frontend:

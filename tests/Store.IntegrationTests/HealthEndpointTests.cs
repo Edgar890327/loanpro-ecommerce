@@ -21,7 +21,7 @@ public sealed class HealthEndpointTests(PostgreSqlFixture fixture) : IClassFixtu
 
         try
         {
-            using var factory = new WebApplicationFactory<Program>();
+            using var factory = new TestApiFactory(fixture);
             using var client = factory.CreateClient();
             using var response = await client.GetAsync("/health");
 
@@ -48,7 +48,7 @@ public sealed class HealthEndpointTests(PostgreSqlFixture fixture) : IClassFixtu
 
         try
         {
-            using var factory = new WebApplicationFactory<Program>()
+            using var factory = new TestApiFactory(fixture)
                 .WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
             using var client = factory.CreateClient();
             using var request = new HttpRequestMessage(HttpMethod.Post, "/test/throw?ignored=private");
@@ -97,4 +97,5 @@ public sealed class HealthEndpointTests(PostgreSqlFixture fixture) : IClassFixtu
             Environment.SetEnvironmentVariable(connectionStringVariable, previousConnectionString);
         }
     }
+
 }

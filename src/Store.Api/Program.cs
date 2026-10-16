@@ -1,7 +1,12 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Store.Api;
+using Store.Api.Admin;
+using Store.Api.Auth;
 using Store.Infrastructure;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +22,54 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddInfrastructure(builder.Configuration);
+var jwtOptions = new JwtOptions
+{
+    Secret = builder.Configuration["JWT_SECRET"] ?? string.Empty,
+    ExpiryMinutes = builder.Configuration.GetValue("JWT_EXPIRY_MINUTES", 15)
+};
+if (string.IsNullOrWhiteSpace(builder.Configuration["ADMIN_PASSWORD"]))
+{
+    throw new InvalidOperationException("ADMIN_PASSWORD is required.");
+}
+
+if (Encoding.UTF8.GetByteCount(jwtOptions.Secret) < 32)
+{
+    throw new InvalidOperationException("JWT_SECRET must contain at least 32 bytes.");
+}
+
+if (jwtOptions.ExpiryMinutes is < 1 or > 60)
+{
+    throw new InvalidOperationException("JWT_EXPIRY_MINUTES must be between 1 and 60.");
+}
+
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.Configure<JwtOptions>(options =>
+{
+    options.Secret = jwtOptions.Secret;
+    options.ExpiryMinutes = jwtOptions.ExpiryMinutes;
+});
+builder.Services.AddSingleton<AdminTokenService>();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOptions.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Admin", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole("Administrator"));
+});
 
 var app = builder.Build();
 
@@ -27,6 +80,8 @@ app.UseExceptionHandler(new ExceptionHandlerOptions
 {
     SuppressDiagnosticsCallback = _ => true
 });
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseStatusCodePages();
 app.UseSwagger();
 app.UseSwaggerUI();
@@ -45,6 +100,10 @@ app.MapGet("/health", async (StoreDbContext database, CancellationToken cancella
             detail: "The database connection is unavailable.");
 })
 .WithName("Health");
+
+app.MapAuthEndpoints();
+app.MapProductEndpoints();
+app.MapErrorLogEndpoints();
 
 app.MapFallbackToFile("index.html");
 
