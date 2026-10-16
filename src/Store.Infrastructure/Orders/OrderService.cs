@@ -13,7 +13,7 @@ namespace Store.Infrastructure.Orders;
 
 public sealed class OrderService(
     IDbContextFactory<StoreDbContext> contextFactory,
-    IShippingStrategy shippingStrategy,
+    IShippingStrategyRegistry shippingStrategies,
     ReservationOptions options,
     TimeProvider timeProvider) : IOrderService
 {
@@ -33,9 +33,19 @@ public sealed class OrderService(
                 product.Name,
                 product.Sku,
                 product.Price,
-                product.Stock - product.Reserved))
+                product.Stock - product.Reserved,
+                product.WeightKg))
             .ToDictionaryAsync(product => product.Id, cancellationToken);
-        return BuildCartValidation(quantities, products);
+        var subtotal = products.Values.Sum(product =>
+            quantities.GetValueOrDefault(product.Id) * product.Price);
+        var shipping = await shippingStrategies.CalculateAsync(
+            new ShippingContext(
+                products.Values.Select(product =>
+                    new ShippingItem(quantities.GetValueOrDefault(product.Id), product.WeightKg)).ToArray(),
+                subtotal,
+                string.Empty),
+            cancellationToken);
+        return BuildCartValidation(quantities, products, shipping.Amount);
     }
 
     public async Task<OrderServiceResult> CreateAsync(
@@ -72,6 +82,7 @@ public sealed class OrderService(
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var reservedItems = new List<OrderItem>();
+        var reservedWeights = new Dictionary<Guid, decimal?>();
         foreach (var (productId, quantity) in quantities.OrderBy(pair => pair.Key))
         {
             var reserved = await TryReserveAsync(
@@ -94,6 +105,7 @@ public sealed class OrderService(
                 reserved.Sku,
                 quantity,
                 reserved.Price));
+            reservedWeights[productId] = reserved.WeightKg;
         }
 
         var subtotal = reservedItems.Sum(item => item.Subtotal);
@@ -103,8 +115,15 @@ public sealed class OrderService(
             return new OrderServiceResult(OrderOutcome.AmountOutOfRange, null, []);
         }
 
-        var shipping = shippingStrategy.CalculateShipping(subtotal);
-        if (shipping < 0 || shipping > MaximumAmount - subtotal)
+        var shipping = await shippingStrategies.CalculateAsync(
+            new ShippingContext(
+                reservedItems.Select(item =>
+                    new ShippingItem(item.Quantity, reservedWeights.GetValueOrDefault(item.ProductId))).ToArray(),
+                subtotal,
+                input.ShippingAddress),
+            cancellationToken);
+        var shippingAmount = shipping.Amount;
+        if (shippingAmount < 0 || shippingAmount > MaximumAmount - subtotal)
         {
             await transaction.RollbackAsync(cancellationToken);
             return new OrderServiceResult(OrderOutcome.AmountOutOfRange, null, []);
@@ -117,7 +136,7 @@ public sealed class OrderService(
             input.CustomerEmail,
             input.ShippingAddress,
             reservedItems,
-            shipping,
+            shippingAmount,
             now,
             now.Add(options.TimeToLive));
         database.Orders.Add(order);
@@ -220,7 +239,8 @@ public sealed class OrderService(
 
     private CartValidationResult BuildCartValidation(
         IReadOnlyDictionary<Guid, int> quantities,
-        IReadOnlyDictionary<Guid, ProductLine> products)
+        IReadOnlyDictionary<Guid, ProductLine> products,
+        decimal shipping)
     {
         var lines = new List<CartLineView>();
         var issues = new List<StockIssue>();
@@ -248,7 +268,6 @@ public sealed class OrderService(
         }
 
         var subtotal = lines.Sum(line => line.Subtotal);
-        var shipping = shippingStrategy.CalculateShipping(subtotal);
         return new CartValidationResult(
             issues.Count == 0,
             lines,
@@ -290,7 +309,7 @@ public sealed class OrderService(
             WHERE "Id" = @productId
               AND NOT "IsDeleted"
               AND "Stock" - "Reserved" >= @quantity
-            RETURNING "Name", "Sku", "Price"
+            RETURNING "Name", "Sku", "Price", "WeightKg"
             """,
             (NpgsqlConnection)database.Database.GetDbConnection(),
             transaction);
@@ -299,7 +318,11 @@ public sealed class OrderService(
         command.Parameters.AddWithValue("updatedAtUtc", updatedAtUtc);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
-            ? new ReservedProduct(reader.GetString(0), reader.GetString(1), reader.GetDecimal(2))
+            ? new ReservedProduct(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetDecimal(2),
+                reader.IsDBNull(3) ? null : reader.GetDecimal(3))
             : null;
     }
 
@@ -380,7 +403,13 @@ public sealed class OrderService(
                 item.Subtotal))
             .ToArray());
 
-    private sealed record ProductLine(Guid Id, string Name, string Sku, decimal Price, int Available);
+    private sealed record ProductLine(
+        Guid Id,
+        string Name,
+        string Sku,
+        decimal Price,
+        int Available,
+        decimal? WeightKg);
 
-    private sealed record ReservedProduct(string Name, string Sku, decimal Price);
+    private sealed record ReservedProduct(string Name, string Sku, decimal Price, decimal? WeightKg);
 }

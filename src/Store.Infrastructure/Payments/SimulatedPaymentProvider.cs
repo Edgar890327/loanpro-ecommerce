@@ -8,7 +8,7 @@ public sealed class SimulatedPaymentProvider : IPaymentProvider
         SimulatedPaymentOptions.ProviderKey,
         "Simulated",
         [
-            new PaymentConfigurationField(
+            new ConfigurationFieldDescriptor(
                 "mode",
                 "Payment mode",
                 "select",
@@ -19,8 +19,22 @@ public sealed class SimulatedPaymentProvider : IPaymentProvider
                     SimulatedPaymentOptions.RejectMode,
                     SimulatedPaymentOptions.RejectByCentsMode
                 ]),
-            new PaymentConfigurationField("latencyMilliseconds", "Latency (milliseconds)", "number", true, false),
-            new PaymentConfigurationField("rejectCents", "Reject amount cents", "number", true, false)
+            new ConfigurationFieldDescriptor(
+                "latencyMilliseconds",
+                "Latency (milliseconds)",
+                "number",
+                true,
+                false,
+                Minimum: 0,
+                Maximum: 30_000),
+            new ConfigurationFieldDescriptor(
+                "rejectCents",
+                "Reject amount cents",
+                "number",
+                true,
+                false,
+                Minimum: 0,
+                Maximum: 99)
         ],
         []);
 

@@ -36,6 +36,8 @@ public static class PaymentProviderEndpoints
                     descriptor.ConfigurationFields,
                     descriptor.SecretFields,
                     new Dictionary<string, string>(StringComparer.Ordinal),
+                    new Dictionary<string, string>(StringComparer.Ordinal),
+                    false,
                     false)
                 : ToResponse(setting));
         }
@@ -56,7 +58,8 @@ public static class PaymentProviderEndpoints
                 new PaymentProviderSettingInput(
                     request.PublicConfiguration ?? new Dictionary<string, string>(StringComparer.Ordinal),
                     request.Secrets ?? new Dictionary<string, string>(StringComparer.Ordinal),
-                    request.Activate),
+                    request.Activate,
+                    request.Enabled),
                 cancellationToken);
             return Results.Ok(ToResponse(setting));
         }
@@ -88,5 +91,7 @@ public static class PaymentProviderEndpoints
         view.Descriptor.ConfigurationFields,
         view.Descriptor.SecretFields,
         view.PublicConfiguration,
+        view.MaskedSecrets,
+        view.IsEnabled,
         view.IsActive);
 }

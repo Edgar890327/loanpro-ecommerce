@@ -167,6 +167,11 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         var providerSettings = await listResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
         Assert.DoesNotContain("secret-not-for-response", providerSettings, StringComparison.Ordinal);
+        using var combinedSettingsResponse = await adminClient.GetAsync("/api/admin/settings");
+        var combinedSettings = await combinedSettingsResponse.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, combinedSettingsResponse.StatusCode);
+        Assert.DoesNotContain("secret-not-for-response", combinedSettings, StringComparison.Ordinal);
+        Assert.Contains("\"clientSecret\":\"********\"", combinedSettings, StringComparison.Ordinal);
 
         using var activateResponse = await adminClient.PutAsJsonAsync(
             "/api/admin/payment-providers/paypal",

@@ -13,7 +13,7 @@ import { PublicProductDetailPage } from '../features/catalog/pages/PublicProduct
 import { CartPage } from '../features/cart/pages/CartPage'
 import { CheckoutPage } from '../features/cart/pages/CheckoutPage'
 import { OrderStatusPage } from '../features/cart/pages/OrderStatusPage'
-import { PaymentProviderSettingsPage } from '../features/payments/pages/PaymentProviderSettingsPage'
+import { SettingsPage } from '../features/settings/pages/SettingsPage'
 import { CartProvider } from '../features/cart/state/CartProvider'
 
 const queryClient = new QueryClient()
@@ -37,7 +37,8 @@ const router = createBrowserRouter([
           { path: 'products/import', element: <ProductImportPage /> },
           { path: 'products/new', element: <ProductFormPage /> },
           { path: 'products/:id/edit', element: <ProductFormPage /> },
-          { path: 'payments', element: <PaymentProviderSettingsPage /> },
+          { path: 'payments', element: <SettingsPage /> },
+          { path: 'settings', element: <SettingsPage /> },
         ],
       },
       {

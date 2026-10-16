@@ -48,7 +48,7 @@ public sealed class PaymentProviderRegistry : IPaymentProviderRegistry, IPayment
         await using var database = await _contextFactory.CreateDbContextAsync(cancellationToken);
         var setting = await database.PaymentProviderSettings
             .AsNoTracking()
-            .SingleOrDefaultAsync(item => item.IsActive, cancellationToken);
+            .SingleOrDefaultAsync(item => item.IsActive && item.IsEnabled, cancellationToken);
         return setting is null ? null : ToView(setting);
     }
 
@@ -70,12 +70,26 @@ public sealed class PaymentProviderRegistry : IPaymentProviderRegistry, IPayment
         CancellationToken cancellationToken)
     {
         var provider = Resolve(providerKey);
-        ValidateConfiguration(provider.Descriptor, input.PublicConfiguration, input.Secrets);
         await using var database = await _contextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await database.Database.BeginTransactionAsync(cancellationToken);
         await AcquireSettingsLockAsync(database, cancellationToken);
         var settings = await database.PaymentProviderSettings.ToListAsync(cancellationToken);
         var existing = settings.SingleOrDefault(item => item.ProviderKey == providerKey);
+        if (existing?.IsActive == true && !input.Enabled)
+        {
+            throw new InvalidOperationException("The active payment provider cannot be disabled.");
+        }
+
+        if (input.Activate && !input.Enabled)
+        {
+            throw new InvalidOperationException("A disabled payment provider cannot be activated.");
+        }
+
+        if (input.Secrets.Keys.Any(key => !provider.Descriptor.SecretFields.Contains(key, StringComparer.Ordinal)))
+        {
+            throw new ArgumentException("Payment provider configuration contains unsupported secret fields.");
+        }
+
         var currentSecrets = existing is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(
@@ -83,11 +97,17 @@ public sealed class PaymentProviderRegistry : IPaymentProviderRegistry, IPayment
                 StringComparer.Ordinal);
         foreach (var secretField in provider.Descriptor.SecretFields)
         {
-            if (input.Secrets.TryGetValue(secretField, out var secret) && !string.IsNullOrEmpty(secret))
+            if (input.Secrets.TryGetValue(secretField, out var secret) && !string.IsNullOrWhiteSpace(secret))
             {
                 currentSecrets[secretField] = secret;
             }
         }
+        ConfigurationSchemaValidator.Validate(
+            provider.Descriptor.ConfigurationFields,
+            provider.Descriptor.SecretFields,
+            input.PublicConfiguration,
+            currentSecrets,
+            input.Activate || existing?.IsActive == true);
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var protectedSecrets = _secretsProtector.Protect(currentSecrets);
@@ -99,12 +119,14 @@ public sealed class PaymentProviderRegistry : IPaymentProviderRegistry, IPayment
                 publicConfigurationJson,
                 protectedSecrets,
                 input.Activate,
-                now);
+                now,
+                input.Enabled);
             database.PaymentProviderSettings.Add(existing);
         }
         else
         {
             existing.Update(publicConfigurationJson, protectedSecrets, now);
+            existing.SetEnabled(input.Enabled, now);
         }
 
         if (input.Activate)
@@ -170,11 +192,9 @@ public sealed class PaymentProviderRegistry : IPaymentProviderRegistry, IPayment
             await database.SaveChangesAsync(cancellationToken);
         }
 
-        var activeCount = await database.PaymentProviderSettings.CountAsync(item => item.IsActive, cancellationToken);
-        if (activeCount != 1)
-        {
-            throw new InvalidOperationException("Exactly one payment provider must be active.");
-        }
+        ActiveSettingInvariant.EnsureExactlyOne(await database.PaymentProviderSettings.CountAsync(
+            item => item.IsActive && item.IsEnabled,
+            cancellationToken));
 
         await transaction.CommitAsync(cancellationToken);
     }
@@ -186,6 +206,8 @@ public sealed class PaymentProviderRegistry : IPaymentProviderRegistry, IPayment
         return new PaymentProviderView(
             Resolve(setting.ProviderKey).Descriptor,
             publicValues,
+            SecretMasker.Mask(_secretsProtector.Unprotect(setting.ProtectedSecrets).Keys),
+            setting.IsEnabled,
             setting.IsActive);
     }
 
@@ -200,94 +222,4 @@ public sealed class PaymentProviderRegistry : IPaymentProviderRegistry, IPayment
         await command.ExecuteScalarAsync(cancellationToken);
     }
 
-    private static void ValidateConfiguration(
-        PaymentProviderDescriptor descriptor,
-        IReadOnlyDictionary<string, string> publicValues,
-        IReadOnlyDictionary<string, string> secrets)
-    {
-        var publicKeys = descriptor.ConfigurationFields
-            .Where(field => !field.Secret)
-            .Select(field => field.Key)
-            .ToHashSet(StringComparer.Ordinal);
-        var secretKeys = descriptor.SecretFields.ToHashSet(StringComparer.Ordinal);
-        if (publicValues.Keys.Any(key => !publicKeys.Contains(key)) ||
-            secrets.Keys.Any(key => !secretKeys.Contains(key)))
-        {
-            throw new ArgumentException("Payment provider configuration contains unsupported fields.");
-        }
-
-        foreach (var field in descriptor.ConfigurationFields.Where(field => !field.Secret))
-        {
-            if (!publicValues.TryGetValue(field.Key, out var value))
-            {
-                if (field.Required)
-                {
-                    throw new ArgumentException($"Configuration field '{field.Key}' is required.");
-                }
-
-                foreach (var secretField in descriptor.SecretFields)
-                {
-                    if (secrets.TryGetValue(secretField, out var secret) && secret.Length > 4000)
-                    {
-                        throw new ArgumentException($"Secret field '{secretField}' is too long.");
-                    }
-                }
-
-                continue;
-            }
-
-            if (value is null)
-            {
-                throw new ArgumentException($"Configuration field '{field.Key}' cannot be null.");
-            }
-
-            if (field.Required && string.IsNullOrWhiteSpace(value))
-            {
-                throw new ArgumentException($"Configuration field '{field.Key}' is required.");
-            }
-
-            if (field.Type == "boolean" && !bool.TryParse(value, out _))
-            {
-                throw new ArgumentException($"Configuration field '{field.Key}' must be true or false.");
-            }
-
-            if (field.Type == "number" &&
-                !decimal.TryParse(value, System.Globalization.NumberStyles.Number,
-                    System.Globalization.CultureInfo.InvariantCulture, out _))
-            {
-                throw new ArgumentException($"Configuration field '{field.Key}' must be numeric.");
-            }
-
-            if (field.Type == "select" && field.Options is not null && !field.Options.Contains(value, StringComparer.Ordinal))
-            {
-                throw new ArgumentException($"Configuration field '{field.Key}' has an unsupported value.");
-            }
-        }
-
-        foreach (var (key, value) in publicValues)
-        {
-            if (value is null)
-            {
-                throw new ArgumentException($"Configuration field '{key}' cannot be null.");
-            }
-
-            if (value.Length > 1000)
-            {
-                throw new ArgumentException($"Configuration field '{key}' is too long.");
-            }
-        }
-
-        foreach (var (key, value) in secrets)
-        {
-            if (!secretKeys.Contains(key))
-            {
-                throw new ArgumentException($"Secret field '{key}' is invalid.");
-            }
-
-            if (value is null || value.Length > 4000)
-            {
-                throw new ArgumentException($"Secret field '{key}' cannot be null or too long.");
-            }
-        }
-    }
 }

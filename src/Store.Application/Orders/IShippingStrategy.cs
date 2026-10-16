@@ -2,5 +2,11 @@ namespace Store.Application;
 
 public interface IShippingStrategy
 {
-    decimal CalculateShipping(decimal subtotal);
+    ShippingStrategyDescriptor Descriptor { get; }
+
+    IReadOnlyDictionary<string, string> DefaultConfiguration { get; }
+
+    decimal CalculateShipping(
+        ShippingContext context,
+        ShippingStrategyConfiguration configuration);
 }

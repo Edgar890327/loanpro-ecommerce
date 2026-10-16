@@ -50,6 +50,10 @@ public static class DependencyInjection
         services.AddSingleton<ProductCsvParser>();
         services.AddScoped<IProductImportService, ProductImportService>();
         services.AddSingleton<IShippingStrategy, FlatRateShippingStrategy>();
+        services.AddScoped<ShippingStrategyRegistry>();
+        services.AddScoped<IShippingStrategyRegistry>(
+            provider => provider.GetRequiredService<ShippingStrategyRegistry>());
+        services.AddScoped<IShippingQuoteService, ShippingQuoteService>();
         services.AddScoped<IOrderService, OrderService>();
         var reservationTtlSeconds = configuration.GetValue<int?>("RESERVATION_TTL_SECONDS");
         var reservationTtlMinutes = configuration.GetValue<int>("RESERVATION_TTL_MINUTES", 15);

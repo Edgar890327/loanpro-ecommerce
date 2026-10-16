@@ -18,7 +18,7 @@ export function Layout() {
           <Link to="/">{t('home')}</Link>
           <Link to="/cart">{t('cart')} ({items.reduce((count, item) => count + item.quantity, 0)})</Link>
           {token && <Link to="/admin/products">{t('products')}</Link>}
-          {token && <Link to="/admin/payments">{t('paymentSettingsTitle')}</Link>}
+          {token && <Link to="/admin/settings">{t('settingsTitle')}</Link>}
         </nav>
         {token
           ? <button className="text-button" type="button" onClick={signOut}>{t('logout')}</button>

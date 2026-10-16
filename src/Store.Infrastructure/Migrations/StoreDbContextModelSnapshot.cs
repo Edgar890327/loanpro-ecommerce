@@ -335,6 +335,11 @@ namespace Store.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("ProtectedSecrets")
                         .IsRequired()
                         .HasColumnType("text");
@@ -441,6 +446,38 @@ namespace Store.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("CK_Products_Stock_Reserved", "\"Stock\" >= \"Reserved\" AND \"Reserved\" >= 0");
                         });
+                });
+
+            modelBuilder.Entity("Store.Domain.ShippingStrategySetting", b =>
+                {
+                    b.Property<string>("StrategyKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ProtectedSecrets")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PublicConfigurationJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("StrategyKey");
+
+                    b.HasIndex("IsActive")
+                        .IsUnique()
+                        .HasFilter("\"IsActive\" = TRUE");
+
+                    b.ToTable("ShippingStrategySettings", (string)null);
                 });
 
             modelBuilder.Entity("Store.Domain.StockMovement", b =>

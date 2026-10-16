@@ -23,6 +23,8 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
 
     public DbSet<PaymentProviderSetting> PaymentProviderSettings => Set<PaymentProviderSetting>();
 
+    public DbSet<ShippingStrategySetting> ShippingStrategySettings => Set<ShippingStrategySetting>();
+
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -181,6 +183,22 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
             entity.Property(setting => setting.ProviderKey).HasMaxLength(64);
             entity.Property(setting => setting.PublicConfigurationJson).IsRequired();
             entity.Property(setting => setting.ProtectedSecrets).IsRequired();
+            entity.Property(setting => setting.IsActive).IsRequired();
+            entity.Property(setting => setting.IsEnabled).HasDefaultValue(true).IsRequired();
+            entity.Property(setting => setting.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(setting => setting.IsActive)
+                .IsUnique()
+                .HasFilter("\"IsActive\" = TRUE");
+        });
+
+        modelBuilder.Entity<ShippingStrategySetting>(entity =>
+        {
+            entity.ToTable("ShippingStrategySettings");
+            entity.HasKey(setting => setting.StrategyKey);
+            entity.Property(setting => setting.StrategyKey).HasMaxLength(64);
+            entity.Property(setting => setting.PublicConfigurationJson).IsRequired();
+            entity.Property(setting => setting.ProtectedSecrets).IsRequired();
+            entity.Property(setting => setting.IsEnabled).IsRequired();
             entity.Property(setting => setting.IsActive).IsRequired();
             entity.Property(setting => setting.UpdatedAtUtc).IsRequired();
             entity.HasIndex(setting => setting.IsActive)

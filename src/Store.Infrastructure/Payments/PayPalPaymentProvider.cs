@@ -19,9 +19,9 @@ public sealed class PayPalPaymentProvider(
         PayPalPaymentOptions.ProviderKey,
         "PayPal",
         [
-            new PaymentConfigurationField("clientId", "PayPal client ID", "text", true, false),
-            new PaymentConfigurationField("sandbox", "Use sandbox", "boolean", true, false),
-            new PaymentConfigurationField("clientSecret", "PayPal client secret", "password", true, true)
+            new ConfigurationFieldDescriptor("clientId", "PayPal client ID", "text", true, false),
+            new ConfigurationFieldDescriptor("sandbox", "Use sandbox", "boolean", true, false),
+            new ConfigurationFieldDescriptor("clientSecret", "PayPal client secret", "password", true, true)
         ],
         ["clientSecret"]);
 

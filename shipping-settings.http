@@ -1,0 +1,28 @@
+@baseUrl = http://localhost:8080
+@adminToken = replace-with-a-short-lived-admin-token
+@productId = 00000000-0000-0000-0000-000000000000
+
+### Public shipping quote
+POST {{baseUrl}}/api/shipping/quote
+Content-Type: application/json
+
+{
+  "items": [{ "productId": "{{productId}}", "quantity": 1 }],
+  "destination": "100 Main Street"
+}
+
+### List payment and shipping settings
+GET {{baseUrl}}/api/admin/settings
+Authorization: Bearer {{adminToken}}
+
+### Update and select flat-rate shipping
+PUT {{baseUrl}}/api/admin/settings/shipping/flat-rate
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "publicConfiguration": { "amountUsd": "5.00" },
+  "secrets": {},
+  "enabled": true,
+  "activate": true
+}

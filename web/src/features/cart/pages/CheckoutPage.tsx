@@ -1,10 +1,17 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useCart } from '../state/useCart'
 import { apiRequest } from '../../../shared/api/api'
 import type { CartValidation } from '../types/CartValidation'
 import type { Order } from '../types/Order'
+
+type ShippingQuote = {
+  strategyKey: string
+  subtotal: number
+  shipping: number
+  total: number
+}
 
 export function CheckoutPage() {
   const { t } = useTranslation()
@@ -16,6 +23,32 @@ export function CheckoutPage() {
   const [shippingAddress, setShippingAddress] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [quote, setQuote] = useState<ShippingQuote | null>(null)
+  const [quoteError, setQuoteError] = useState(false)
+
+  useEffect(() => {
+    setQuote(null)
+    setQuoteError(false)
+    if (!shippingAddress.trim()) return
+    let active = true
+    const timeout = window.setTimeout(() => {
+      void apiRequest<ShippingQuote>('/api/shipping/quote', null, {
+        method: 'POST',
+        body: JSON.stringify({
+          items: items.map(({ productId, quantity }) => ({ productId, quantity })),
+          destination: shippingAddress,
+        }),
+      }).then((result) => {
+        if (active) setQuote(result)
+      }).catch(() => {
+        if (active) setQuoteError(true)
+      })
+    }, 300)
+    return () => {
+      active = false
+      window.clearTimeout(timeout)
+    }
+  }, [items, shippingAddress])
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -66,6 +99,8 @@ export function CheckoutPage() {
         <label>{t('customerName')}<input required maxLength={200} value={customerName} onChange={(event) => setCustomerName(event.target.value)} /></label>
         <label>{t('customerEmail')}<input required type="email" maxLength={320} value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
         <label>{t('shippingAddress')}<textarea required maxLength={1000} value={shippingAddress} onChange={(event) => setShippingAddress(event.target.value)} /></label>
+        {quote && <p role="status">{t('shippingQuote', { amount: quote.shipping.toFixed(2) })}</p>}
+        {quoteError && <p role="alert">{t('shippingQuoteFailed')}</p>}
         {error && <p role="alert">{error}</p>}
         <button className="primary-button" type="submit" disabled={submitting}>
           {submitting ? t('loading') : t('placeOrder')}
