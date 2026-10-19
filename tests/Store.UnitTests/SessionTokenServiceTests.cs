@@ -21,7 +21,7 @@ public sealed class SessionTokenServiceTests
     [InlineData(UserRole.Customer)]
     public void Issue_CreatesAShortLivedJwtCarryingOnlyTheIdAndRole(UserRole role)
     {
-        var profile = new UserProfile(Guid.NewGuid(), "Ana", role, null);
+        var profile = new UserProfile(Guid.NewGuid(), "Ana", role, null, "ana@example.com");
 
         var token = CreateService().Issue(profile);
         var principal = Validate(token.AccessToken, Now.UtcDateTime);
@@ -37,7 +37,7 @@ public sealed class SessionTokenServiceTests
     [Fact]
     public void Validation_RejectsAnExpiredToken()
     {
-        var token = CreateService().Issue(new UserProfile(Guid.NewGuid(), "Ana", UserRole.Customer, null));
+        var token = CreateService().Issue(new UserProfile(Guid.NewGuid(), "Ana", UserRole.Customer, null, "ana@example.com"));
 
         Assert.Throws<SecurityTokenExpiredException>(
             () => Validate(token.AccessToken, Now.AddMinutes(11).UtcDateTime));
@@ -49,7 +49,7 @@ public sealed class SessionTokenServiceTests
         var other = new SessionTokenService(
             Options.Create(new JwtOptions { Secret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)) }),
             new FixedTimeProvider(Now));
-        var token = other.Issue(new UserProfile(Guid.NewGuid(), "Ana", UserRole.Admin, null));
+        var token = other.Issue(new UserProfile(Guid.NewGuid(), "Ana", UserRole.Admin, null, "ana@example.com"));
 
         Assert.Throws<SecurityTokenSignatureKeyNotFoundException>(
             () => Validate(token.AccessToken, Now.UtcDateTime));

@@ -5,19 +5,22 @@ namespace Store.UnitTests;
 public sealed class CheckoutValidationTests
 {
     [Fact]
-    public void CheckoutValidator_RejectsInvalidGuestDetailsAndQuantities()
+    public void CheckoutValidator_RejectsMissingAddressFieldsAndInvalidItems()
     {
         var input = new CheckoutInput(
-            " ",
-            "not-an-email",
-            new string('x', 1001),
+            Guid.NewGuid(),
+            new ShippingAddressInput(" ", new string('x', 201), new string('y', 201), "", "", "", ""),
             [new CartItemInput(Guid.Empty, 0)]);
 
         var errors = CheckoutValidator.Validate(input);
 
-        Assert.Contains(nameof(input.CustomerName), errors.Keys);
-        Assert.Contains(nameof(input.CustomerEmail), errors.Keys);
-        Assert.Contains(nameof(input.ShippingAddress), errors.Keys);
+        Assert.Contains("RecipientName", errors.Keys);
+        Assert.Contains("Line1", errors.Keys);
+        Assert.Contains("Line2", errors.Keys);
+        Assert.Contains("City", errors.Keys);
+        Assert.Contains("Region", errors.Keys);
+        Assert.Contains("PostalCode", errors.Keys);
+        Assert.Contains("Country", errors.Keys);
         Assert.Contains(nameof(input.Items), errors.Keys);
     }
 
@@ -45,12 +48,11 @@ public sealed class CheckoutValidationTests
     }
 
     [Fact]
-    public void CheckoutValidator_AcceptsValidGuestDetails()
+    public void CheckoutValidator_AcceptsAValidAddressWithoutLineTwo()
     {
         var input = new CheckoutInput(
-            "Guest Buyer",
-            "buyer@example.test",
-            "100 Test Street",
+            Guid.NewGuid(),
+            new ShippingAddressInput("Buyer", "100 Test Street", null, "Austin", "TX", "73301", "US"),
             [new CartItemInput(Guid.NewGuid(), 2)]);
 
         Assert.Empty(CheckoutValidator.Validate(input));

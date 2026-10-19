@@ -55,11 +55,10 @@ public sealed class OrderService(
     {
         var quantities = Consolidate(input.Items);
         var idempotencyHash = Hash(idempotencyKey.Trim());
+        var address = NormalizeAddress(input.ShippingAddress);
         var requestHash = Hash(JsonSerializer.Serialize(new
         {
-            CustomerName = input.CustomerName.Trim(),
-            CustomerEmail = input.CustomerEmail.Trim(),
-            ShippingAddress = input.ShippingAddress.Trim(),
+            ShippingAddress = address,
             Items = quantities.OrderBy(pair => pair.Key)
         }));
         await using var database = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -67,11 +66,28 @@ public sealed class OrderService(
             IsolationLevel.ReadCommitted,
             cancellationToken);
         var dbTransaction = (NpgsqlTransaction)transaction.GetDbTransaction();
-        await AcquireIdempotencyLockAsync(database, dbTransaction, idempotencyHash, cancellationToken);
+        await AcquireIdempotencyLockAsync(
+            database,
+            dbTransaction,
+            Hash($"{input.CustomerId:N}:{idempotencyKey.Trim()}"),
+            cancellationToken);
+
+        var contactEmail = await database.Users
+            .AsNoTracking()
+            .Where(user => user.Id == input.CustomerId && user.IsActive)
+            .Select(user => user.Email)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (contactEmail is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new OrderServiceResult(OrderOutcome.NotFound, null, []);
+        }
 
         var existing = await database.Orders
             .Include(order => order.Items)
-            .SingleOrDefaultAsync(order => order.IdempotencyKeyHash == idempotencyHash, cancellationToken);
+            .SingleOrDefaultAsync(
+                order => order.CustomerId == input.CustomerId && order.IdempotencyKeyHash == idempotencyHash,
+                cancellationToken);
         if (existing is not null)
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -120,7 +136,7 @@ public sealed class OrderService(
                 reservedItems.Select(item =>
                     new ShippingItem(item.Quantity, reservedWeights.GetValueOrDefault(item.ProductId))).ToArray(),
                 subtotal,
-                input.ShippingAddress),
+                address.Country),
             cancellationToken);
         var shippingAmount = shipping.Amount;
         if (shippingAmount < 0 || shippingAmount > MaximumAmount - subtotal)
@@ -129,12 +145,16 @@ public sealed class OrderService(
             return new OrderServiceResult(OrderOutcome.AmountOutOfRange, null, []);
         }
 
+        var orderNumber = OrderNumberFormatter.Format(
+            now,
+            await NextOrderSequenceAsync(database, dbTransaction, cancellationToken));
         var order = new Order(
+            input.CustomerId,
+            orderNumber,
             idempotencyHash,
             requestHash,
-            input.CustomerName,
-            input.CustomerEmail,
-            input.ShippingAddress,
+            contactEmail,
+            address,
             reservedItems,
             shippingAmount,
             now,
@@ -145,31 +165,33 @@ public sealed class OrderService(
         return new OrderServiceResult(OrderOutcome.Created, ToView(order), []);
     }
 
-    public async Task<OrderView?> GetAsync(Guid orderId, CancellationToken cancellationToken)
+    public async Task<OrderView?> GetAsync(Guid orderId, Guid customerId, CancellationToken cancellationToken)
     {
         await using var database = await contextFactory.CreateDbContextAsync(cancellationToken);
         var order = await database.Orders
             .AsNoTracking()
             .Include(item => item.Items)
-            .SingleOrDefaultAsync(item => item.Id == orderId, cancellationToken);
+            .SingleOrDefaultAsync(
+                item => item.Id == orderId && item.CustomerId == customerId,
+                cancellationToken);
         return order is null ? null : ToView(order);
     }
 
     public Task<OrderServiceResult> CancelAsync(
         Guid orderId,
-        string idempotencyKey,
+        Guid customerId,
         CancellationToken cancellationToken) =>
-        TransitionAndReleaseAsync(orderId, idempotencyKey, OrderState.Cancelled, cancellationToken);
+        TransitionAndReleaseAsync(orderId, customerId, OrderState.Cancelled, cancellationToken);
 
     public Task<OrderServiceResult> FailAsync(
         Guid orderId,
-        string idempotencyKey,
+        Guid customerId,
         CancellationToken cancellationToken) =>
-        TransitionAndReleaseAsync(orderId, idempotencyKey, OrderState.Failed, cancellationToken);
+        TransitionAndReleaseAsync(orderId, customerId, OrderState.Failed, cancellationToken);
 
     private async Task<OrderServiceResult> TransitionAndReleaseAsync(
         Guid orderId,
-        string idempotencyKey,
+        Guid customerId,
         OrderState targetState,
         CancellationToken cancellationToken)
     {
@@ -180,16 +202,10 @@ public sealed class OrderService(
         var order = await database.Orders
             .Include(item => item.Items)
             .SingleOrDefaultAsync(item => item.Id == orderId, cancellationToken);
-        if (order is null)
+        if (order is null || order.CustomerId != customerId)
         {
             await transaction.RollbackAsync(cancellationToken);
             return new OrderServiceResult(OrderOutcome.NotFound, null, []);
-        }
-
-        if (order.IdempotencyKeyHash != Hash(idempotencyKey.Trim()))
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            return new OrderServiceResult(OrderOutcome.InvalidCapability, null, []);
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -381,17 +397,48 @@ public sealed class OrderService(
         await command.ExecuteScalarAsync(cancellationToken);
     }
 
+    private static async Task<long> NextOrderSequenceAsync(
+        StoreDbContext database,
+        NpgsqlTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT nextval('\"OrderNumberSequence\"')",
+            (NpgsqlConnection)database.Database.GetDbConnection(),
+            transaction);
+        return (long)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
+    private static ShippingAddress NormalizeAddress(ShippingAddressInput input) => new(
+        input.RecipientName.Trim(),
+        input.Line1.Trim(),
+        string.IsNullOrWhiteSpace(input.Line2) ? null : input.Line2.Trim(),
+        input.City.Trim(),
+        input.Region.Trim(),
+        input.PostalCode.Trim(),
+        input.Country.Trim());
+
     private static string Hash(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 
     private static OrderView ToView(Order order) => new(
         order.Id,
+        order.OrderNumber,
         order.State.ToString(),
         order.ReservedUntilUtc,
         order.CreatedAtUtc,
         order.Subtotal,
         order.Shipping,
         order.Total,
+        order.ContactEmail,
+        new ShippingAddressView(
+            order.ShippingAddress.RecipientName,
+            order.ShippingAddress.Line1,
+            order.ShippingAddress.Line2,
+            order.ShippingAddress.City,
+            order.ShippingAddress.Region,
+            order.ShippingAddress.PostalCode,
+            order.ShippingAddress.Country),
         order.Items
             .OrderBy(item => item.ProductName)
             .Select(item => new OrderItemView(

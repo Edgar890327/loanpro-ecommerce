@@ -33,6 +33,7 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
     {
         modelBuilder.HasPostgresExtension("pg_trgm");
         modelBuilder.HasPostgresExtension("unaccent");
+        modelBuilder.HasSequence<long>("OrderNumberSequence").StartsAt(1).IncrementsBy(1);
 
         modelBuilder.Entity<User>(entity =>
         {
@@ -143,9 +144,23 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
             entity.HasKey(order => order.Id);
             entity.Property(order => order.IdempotencyKeyHash).HasMaxLength(64).IsRequired();
             entity.Property(order => order.RequestHash).HasMaxLength(64).IsRequired();
-            entity.Property(order => order.CustomerName).HasMaxLength(200).IsRequired();
-            entity.Property(order => order.CustomerEmail).HasMaxLength(320).IsRequired();
-            entity.Property(order => order.ShippingAddress).HasMaxLength(1000).IsRequired();
+            entity.Property(order => order.OrderNumber).HasMaxLength(20).IsRequired();
+            entity.Property(order => order.ContactEmail).HasMaxLength(320).IsRequired();
+            entity.OwnsOne(order => order.ShippingAddress, address =>
+            {
+                address.Property(item => item.RecipientName).HasColumnName("ShipRecipientName").HasMaxLength(200).IsRequired();
+                address.Property(item => item.Line1).HasColumnName("ShipLine1").HasMaxLength(200).IsRequired();
+                address.Property(item => item.Line2).HasColumnName("ShipLine2").HasMaxLength(200);
+                address.Property(item => item.City).HasColumnName("ShipCity").HasMaxLength(100).IsRequired();
+                address.Property(item => item.Region).HasColumnName("ShipRegion").HasMaxLength(100).IsRequired();
+                address.Property(item => item.PostalCode).HasColumnName("ShipPostalCode").HasMaxLength(20).IsRequired();
+                address.Property(item => item.Country).HasColumnName("ShipCountry").HasMaxLength(100).IsRequired();
+            });
+            entity.Navigation(order => order.ShippingAddress).IsRequired();
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(order => order.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.Property(order => order.Subtotal).HasPrecision(12, 2).IsRequired();
             entity.Property(order => order.Shipping).HasPrecision(12, 2).IsRequired();
             entity.Property(order => order.Total).HasPrecision(12, 2).IsRequired();
@@ -153,7 +168,11 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
             entity.Property(order => order.CreatedAtUtc).IsRequired();
             entity.Property(order => order.ReservedUntilUtc).IsRequired();
             entity.Property(order => order.UpdatedAtUtc).IsRequired();
-            entity.HasIndex(order => order.IdempotencyKeyHash).IsUnique();
+            entity.HasIndex(order => new { order.CustomerId, order.IdempotencyKeyHash }).IsUnique();
+            entity.HasIndex(order => order.OrderNumber).IsUnique();
+            entity.HasIndex(order => new { order.CustomerId, order.CreatedAtUtc, order.Id })
+                .IsDescending(false, true, true);
+            entity.HasIndex(order => new { order.CustomerId, order.State });
             entity.HasIndex(order => new { order.State, order.ReservedUntilUtc });
         });
 

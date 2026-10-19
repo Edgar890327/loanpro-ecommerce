@@ -55,7 +55,7 @@ export function OrderStatusPage() {
     <section className="panel order-status">
       <p className="eyebrow">{t('orderStatus')}</p>
       <h1>{t(`orderState${order.data.state}`)}</h1>
-      <p>{t('orderReference', { id: order.data.id })}</p>
+      <p>{t('orderReference', { number: order.data.orderNumber })}</p>
       {order.data.state === 'Reserved' && <p role="timer">{t('reservationCountdown', { minutes: formatNumber(Math.floor(remaining / 60), i18n.language, 0), seconds: String(remaining % 60).padStart(2, '0') })}</p>}
       {order.data.state === 'Reserved' && remaining === 0 && <p role="status">{t('reservationFinishing')}</p>}
       {order.data.state === 'Reserved' && accessKey && (

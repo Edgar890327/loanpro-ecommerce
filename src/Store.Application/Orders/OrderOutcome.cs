@@ -8,6 +8,5 @@ public enum OrderOutcome
     AmountOutOfRange,
     IdempotencyConflict,
     NotFound,
-    InvalidCapability,
     AlreadyFinalized
 }

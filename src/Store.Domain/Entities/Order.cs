@@ -8,11 +8,13 @@ public sealed class Order
 
     public string RequestHash { get; private set; } = string.Empty;
 
-    public string CustomerName { get; private set; } = string.Empty;
+    public Guid CustomerId { get; private set; }
 
-    public string CustomerEmail { get; private set; } = string.Empty;
+    public string OrderNumber { get; private set; } = string.Empty;
 
-    public string ShippingAddress { get; private set; } = string.Empty;
+    public string ContactEmail { get; private set; } = string.Empty;
+
+    public ShippingAddress ShippingAddress { get; private set; } = null!;
 
     public decimal Subtotal { get; private set; }
 
@@ -37,11 +39,12 @@ public sealed class Order
     }
 
     public Order(
+        Guid customerId,
+        string orderNumber,
         string idempotencyKeyHash,
         string requestHash,
-        string customerName,
-        string customerEmail,
-        string shippingAddress,
+        string contactEmail,
+        ShippingAddress shippingAddress,
         IEnumerable<OrderItem> items,
         decimal shipping,
         DateTime nowUtc,
@@ -52,11 +55,12 @@ public sealed class Order
             throw new ArgumentOutOfRangeException(nameof(shipping));
         }
 
+        CustomerId = customerId;
+        OrderNumber = orderNumber;
         IdempotencyKeyHash = idempotencyKeyHash;
         RequestHash = requestHash;
-        CustomerName = customerName.Trim();
-        CustomerEmail = customerEmail.Trim();
-        ShippingAddress = shippingAddress.Trim();
+        ContactEmail = contactEmail.Trim();
+        ShippingAddress = shippingAddress;
         Items = items.ToList();
         Subtotal = Items.Sum(item => item.Subtotal);
         Shipping = shipping;

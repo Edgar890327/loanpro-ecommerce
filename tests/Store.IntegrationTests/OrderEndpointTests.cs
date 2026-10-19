@@ -18,10 +18,14 @@ public sealed class OrderEndpointTests(PostgreSqlFixture fixture) : IClassFixtur
         using var adminClient = factory.CreateClient();
         await SignInAsync(adminClient, factory.AdminPassword);
         var product = await CreateProductAsync(adminClient, 1);
-        using var publicClient = factory.CreateClient();
+        var buyers = new List<HttpClient>();
+        for (var index = 0; index < 12; index++)
+        {
+            buyers.Add(await CreateCustomerClientAsync(factory));
+        }
 
-        var attempts = Enumerable.Range(0, 12).Select(index =>
-            CreateOrderAsync(publicClient, product.Id, Guid.NewGuid().ToString("N") + index.ToString("D2"))).ToArray();
+        var attempts = buyers.Select(buyer =>
+            CreateOrderAsync(buyer, product.Id, Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"))).ToArray();
         var responses = await Task.WhenAll(attempts);
 
         Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.Created));
@@ -31,13 +35,15 @@ public sealed class OrderEndpointTests(PostgreSqlFixture fixture) : IClassFixtur
         var storedProduct = await database.Products.SingleAsync(item => item.Id == product.Id);
         Assert.Equal(1, storedProduct.Reserved);
         Assert.True(storedProduct.Reserved <= storedProduct.Stock);
-        using var catalogResponse = await publicClient.GetAsync($"/api/catalog/{product.Id}");
+        using var catalogResponse = await buyers[0].GetAsync($"/api/catalog/{product.Id}");
         var catalogProduct = await catalogResponse.Content.ReadFromJsonAsync<CatalogProductResponse>();
         Assert.Equal(0, catalogProduct!.Stock);
         foreach (var response in responses)
         {
             response.Dispose();
         }
+
+        buyers.ForEach(buyer => buyer.Dispose());
     }
 
     [Fact]
@@ -47,7 +53,7 @@ public sealed class OrderEndpointTests(PostgreSqlFixture fixture) : IClassFixtur
         using var adminClient = factory.CreateClient();
         await SignInAsync(adminClient, factory.AdminPassword);
         var product = await CreateProductAsync(adminClient, 4);
-        using var client = factory.CreateClient();
+        using var client = await CreateCustomerClientAsync(factory);
         var line = new { productId = product.Id, quantity = 2 };
 
         using var validation = await client.PostAsJsonAsync("/api/cart/validate", new { items = new[] { line } });
@@ -86,7 +92,7 @@ public sealed class OrderEndpointTests(PostgreSqlFixture fixture) : IClassFixtur
         using var adminClient = factory.CreateClient();
         await SignInAsync(adminClient, factory.AdminPassword);
         var product = await CreateProductAsync(adminClient, 1);
-        using var client = factory.CreateClient();
+        using var client = await CreateCustomerClientAsync(factory);
         var key = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
         using var response = await CreateOrderAsync(client, product.Id, key);
         var created = await response.Content.ReadFromJsonAsync<OrderPayload>();
@@ -112,30 +118,97 @@ public sealed class OrderEndpointTests(PostgreSqlFixture fixture) : IClassFixtur
     }
 
     [Fact]
-    public async Task CancelOrderReleasesInventoryAndStatusDoesNotExposeGuestDetails()
+    public async Task CancelOrderReleasesInventoryAndForeignCustomersCannotSeeOrCancelIt()
     {
         using var factory = new TestApiFactory(fixture);
         using var adminClient = factory.CreateClient();
         await SignInAsync(adminClient, factory.AdminPassword);
         var product = await CreateProductAsync(adminClient, 2);
-        using var client = factory.CreateClient();
-        var key = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
-        using var response = await CreateOrderAsync(client, product.Id, key);
+        using var client = await CreateCustomerClientAsync(factory);
+        using var other = await CreateCustomerClientAsync(factory);
+        using var response = await CreateOrderAsync(client, product.Id, Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"));
         var created = await response.Content.ReadFromJsonAsync<OrderPayload>();
 
-        using var status = await client.GetAsync($"/api/orders/{created!.Id}");
-        var statusContent = await status.Content.ReadAsStringAsync();
-        Assert.DoesNotContain("buyer@example.test", statusContent, StringComparison.Ordinal);
-        Assert.DoesNotContain("Guest Buyer", statusContent, StringComparison.Ordinal);
-        Assert.DoesNotContain("100 Test Street", statusContent, StringComparison.Ordinal);
+        using var foreignStatus = await other.GetAsync($"/api/orders/{created!.Id}");
+        using var foreignCancel = await other.PostAsync($"/api/orders/{created.Id}/cancel", null);
+        Assert.Equal(HttpStatusCode.NotFound, foreignStatus.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, foreignCancel.StatusCode);
 
-        using var cancelledRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/orders/{created.Id}/cancel");
-        cancelledRequest.Headers.Add("Idempotency-Key", key);
-        using var cancelled = await client.SendAsync(cancelledRequest);
+        using var cancelled = await client.PostAsync($"/api/orders/{created.Id}/cancel", null);
         Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
         var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<StoreDbContext>>();
         await using var database = await contextFactory.CreateDbContextAsync();
         Assert.Equal(0, (await database.Products.SingleAsync(item => item.Id == product.Id)).Reserved);
+    }
+
+    [Fact]
+    public async Task CreatingOrdersRequiresACustomerSession()
+    {
+        using var factory = new TestApiFactory(fixture);
+        using var adminClient = factory.CreateClient();
+        await SignInAsync(adminClient, factory.AdminPassword);
+        var product = await CreateProductAsync(adminClient, 2);
+        using var anonymous = factory.CreateClient();
+
+        using var withoutSession = await CreateOrderAsync(anonymous, product.Id, Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"));
+        using var asAdmin = await CreateOrderAsync(adminClient, product.Id, Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"));
+        using var customer = await CreateCustomerClientAsync(factory);
+        using var asCustomer = await CreateOrderAsync(customer, product.Id, Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, withoutSession.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, asAdmin.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, asCustomer.StatusCode);
+        var order = await asCustomer.Content.ReadFromJsonAsync<OrderPayload>();
+        Assert.Matches(@"^ORD-\d{4}-\d{6,}$", order!.OrderNumber);
+    }
+
+    [Fact]
+    public async Task SameIdempotencyKeyFromTwoCustomersCreatesTwoOrders()
+    {
+        using var factory = new TestApiFactory(fixture);
+        using var adminClient = factory.CreateClient();
+        await SignInAsync(adminClient, factory.AdminPassword);
+        var product = await CreateProductAsync(adminClient, 4);
+        using var first = await CreateCustomerClientAsync(factory);
+        using var second = await CreateCustomerClientAsync(factory);
+        var key = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+
+        using var firstResponse = await CreateOrderAsync(first, product.Id, key);
+        using var secondResponse = await CreateOrderAsync(second, product.Id, key);
+        var firstOrder = await firstResponse.Content.ReadFromJsonAsync<OrderPayload>();
+        var secondOrder = await secondResponse.Content.ReadFromJsonAsync<OrderPayload>();
+
+        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, secondResponse.StatusCode);
+        Assert.NotEqual(firstOrder!.Id, secondOrder!.Id);
+        Assert.NotEqual(firstOrder.OrderNumber, secondOrder.OrderNumber);
+    }
+
+    [Fact]
+    public async Task FrozenShippingAddressDoesNotChangeWhenTheProfileChanges()
+    {
+        using var factory = new TestApiFactory(fixture);
+        using var adminClient = factory.CreateClient();
+        await SignInAsync(adminClient, factory.AdminPassword);
+        var product = await CreateProductAsync(adminClient, 2);
+        using var client = await CreateCustomerClientAsync(factory);
+        using var response = await CreateOrderAsync(client, product.Id, Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"));
+        var created = await response.Content.ReadFromJsonAsync<OrderPayload>();
+        var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<StoreDbContext>>();
+        await using (var database = await contextFactory.CreateDbContextAsync())
+        {
+            var ownerId = await database.Orders.Where(item => item.Id == created!.Id)
+                .Select(item => item.CustomerId).SingleAsync();
+            await database.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"Users\" SET \"FullName\" = 'Renamed Person', \"Email\" = 'renamed@example.com' WHERE \"Id\" = {ownerId}");
+        }
+
+        using var status = await client.GetAsync($"/api/orders/{created!.Id}");
+        var reloaded = await status.Content.ReadFromJsonAsync<OrderPayload>();
+
+        Assert.Equal("Buyer", reloaded!.ShippingAddress!.RecipientName);
+        Assert.Equal("100 Test Street", reloaded.ShippingAddress.Line1);
+        Assert.NotEqual("renamed@example.com", reloaded.ContactEmail);
     }
 
     [Fact]
@@ -145,7 +218,7 @@ public sealed class OrderEndpointTests(PostgreSqlFixture fixture) : IClassFixtur
         using var adminClient = factory.CreateClient();
         await SignInAsync(adminClient, factory.AdminPassword);
         var product = await CreateProductAsync(adminClient, 1);
-        using var client = factory.CreateClient();
+        using var client = await CreateCustomerClientAsync(factory);
         var key = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
         using var response = await CreateOrderAsync(client, product.Id, key);
         var created = await response.Content.ReadFromJsonAsync<OrderPayload>();
@@ -153,7 +226,8 @@ public sealed class OrderEndpointTests(PostgreSqlFixture fixture) : IClassFixtur
 
         await using var scope = factory.Services.CreateAsyncScope();
         var orders = scope.ServiceProvider.GetRequiredService<IOrderService>();
-        var result = await orders.FailAsync(created!.Id, key, CancellationToken.None);
+        var ownerId = await StoredCustomerIdAsync(factory, created!.Id);
+        var result = await orders.FailAsync(created.Id, ownerId, CancellationToken.None);
 
         Assert.Equal(OrderOutcome.Created, result.Outcome);
         Assert.Equal("Failed", result.Order!.State);
@@ -169,7 +243,7 @@ public sealed class OrderEndpointTests(PostgreSqlFixture fixture) : IClassFixtur
         using var adminClient = factory.CreateClient();
         await SignInAsync(adminClient, factory.AdminPassword);
         var product = await CreateProductAsync(adminClient, 2);
-        using var customerClient = factory.CreateClient();
+        using var customerClient = await CreateCustomerClientAsync(factory);
         var key = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
         using var order = await CreateOrderAsync(customerClient, product.Id, key, 2);
         Assert.Equal(HttpStatusCode.Created, order.StatusCode);
@@ -202,14 +276,12 @@ public sealed class OrderEndpointTests(PostgreSqlFixture fixture) : IClassFixtur
         await SignInAsync(adminClient, factory.AdminPassword);
         var availableProduct = await CreateProductAsync(adminClient, 3);
         var unavailableProduct = await CreateProductAsync(adminClient, 0);
-        using var client = factory.CreateClient();
+        using var client = await CreateCustomerClientAsync(factory);
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/orders")
         {
             Content = JsonContent.Create(new
             {
-                customerName = "Guest Buyer",
-                customerEmail = "buyer@example.test",
-                shippingAddress = "100 Test Street",
+                shippingAddress = Address,
                 items = new[]
                 {
                     new { productId = availableProduct.Id, quantity = 1 },
@@ -248,9 +320,7 @@ public sealed class OrderEndpointTests(PostgreSqlFixture fixture) : IClassFixtur
         {
             Content = JsonContent.Create(new
             {
-                customerName = "Guest Buyer",
-                customerEmail = "buyer@example.test",
-                shippingAddress = "100 Test Street",
+                shippingAddress = Address,
                 items = new[] { new { productId, quantity } }
             })
         };
@@ -262,5 +332,37 @@ public sealed class OrderEndpointTests(PostgreSqlFixture fixture) : IClassFixtur
         AuthTestClient.SignInAsync(client, TestApiFactory.AdminEmail, password);
 
 
-    private sealed record OrderPayload(Guid Id, string State);
+    private static readonly object Address = new
+    {
+        recipientName = "Buyer",
+        line1 = "100 Test Street",
+        line2 = (string?)null,
+        city = "Austin",
+        region = "TX",
+        postalCode = "73301",
+        country = "US"
+    };
+
+    private static async Task<HttpClient> CreateCustomerClientAsync(TestApiFactory factory)
+    {
+        var client = factory.CreateClient();
+        await AuthTestClient.RegisterCustomerAsync(client);
+        return client;
+    }
+
+    private static async Task<Guid> StoredCustomerIdAsync(TestApiFactory factory, Guid orderId)
+    {
+        var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<StoreDbContext>>();
+        await using var database = await contextFactory.CreateDbContextAsync();
+        return await database.Orders.Where(item => item.Id == orderId).Select(item => item.CustomerId).SingleAsync();
+    }
+
+    private sealed record AddressPayload(string RecipientName, string Line1);
+
+    private sealed record OrderPayload(
+        Guid Id,
+        string State,
+        string OrderNumber,
+        string ContactEmail,
+        AddressPayload? ShippingAddress);
 }

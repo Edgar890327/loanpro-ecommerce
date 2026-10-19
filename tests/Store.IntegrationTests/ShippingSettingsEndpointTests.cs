@@ -33,12 +33,14 @@ public sealed class ShippingSettingsEndpointTests(PostgreSqlFixture fixture) : I
         await SaveShippingRateAsync(client, "12.50");
         Assert.Equal(12.50m, await QuoteAsync(publicClient, productId));
 
-        var order = await CreateOrderAsync(publicClient, productId);
+        using var customerClient = factory.CreateClient();
+        await AuthTestClient.RegisterCustomerAsync(customerClient);
+        var order = await CreateOrderAsync(customerClient, productId);
         Assert.Equal(12.50m, order.Shipping);
         await SaveShippingRateAsync(client, "6.25");
         Assert.Equal(6.25m, await QuoteAsync(publicClient, productId));
 
-        using var orderResponse = await publicClient.GetAsync($"/api/orders/{order.Id}");
+        using var orderResponse = await customerClient.GetAsync($"/api/orders/{order.Id}");
         using var orderJson = JsonDocument.Parse(await orderResponse.Content.ReadAsStringAsync());
         Assert.Equal(12.50m, orderJson.RootElement.GetProperty("shipping").GetDecimal());
     }
@@ -95,9 +97,15 @@ public sealed class ShippingSettingsEndpointTests(PostgreSqlFixture fixture) : I
         {
             Content = JsonContent.Create(new
             {
-                customerName = "Guest",
-                customerEmail = "guest@example.test",
-                shippingAddress = "100 Main Street",
+                shippingAddress = new
+                {
+                    recipientName = "Buyer",
+                    line1 = "100 Main Street",
+                    city = "Austin",
+                    region = "TX",
+                    postalCode = "73301",
+                    country = "US"
+                },
                 items = new[] { new { productId, quantity = 1 } }
             })
         };

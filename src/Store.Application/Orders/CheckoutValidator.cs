@@ -1,5 +1,3 @@
-using System.Net.Mail;
-
 namespace Store.Application;
 
 public static class CheckoutValidator
@@ -7,23 +5,18 @@ public static class CheckoutValidator
     public static IReadOnlyDictionary<string, string[]> Validate(CheckoutInput input)
     {
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
-        if (string.IsNullOrWhiteSpace(input.CustomerName) || input.CustomerName.Trim().Length > 200)
+        var address = input.ShippingAddress;
+        Require(errors, "RecipientName", address?.RecipientName, 200);
+        Require(errors, "Line1", address?.Line1, 200);
+        if (address?.Line2 is { } line2 && line2.Trim().Length > 200)
         {
-            errors[nameof(input.CustomerName)] = ["Customer name is required and must be at most 200 characters."];
+            errors["Line2"] = ["Address line 2 must be at most 200 characters."];
         }
 
-        if (string.IsNullOrWhiteSpace(input.CustomerEmail) ||
-            input.CustomerEmail.Trim().Length > 320 ||
-            !MailAddress.TryCreate(input.CustomerEmail.Trim(), out _))
-        {
-            errors[nameof(input.CustomerEmail)] = ["A valid email address of at most 320 characters is required."];
-        }
-
-        if (string.IsNullOrWhiteSpace(input.ShippingAddress) || input.ShippingAddress.Trim().Length > 1000)
-        {
-            errors[nameof(input.ShippingAddress)] =
-                ["Shipping address is required and must be at most 1000 characters."];
-        }
+        Require(errors, "City", address?.City, 100);
+        Require(errors, "Region", address?.Region, 100);
+        Require(errors, "PostalCode", address?.PostalCode, 20);
+        Require(errors, "Country", address?.Country, 100);
 
         if (input.Items.Count is < 1 or > 50)
         {
@@ -35,5 +28,13 @@ public static class CheckoutValidator
         }
 
         return errors;
+    }
+
+    private static void Require(Dictionary<string, string[]> errors, string field, string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Trim().Length > maxLength)
+        {
+            errors[field] = [$"{field} is required and must be at most {maxLength} characters."];
+        }
     }
 }

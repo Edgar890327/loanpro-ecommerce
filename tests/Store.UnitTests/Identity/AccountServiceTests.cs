@@ -111,6 +111,6 @@ public sealed class AccountServiceTests
 
         var profile = await service.GetProfileAsync(registered.Profile!.Id, CancellationToken.None);
 
-        Assert.Equal(new UserProfile(registered.Profile.Id, "Ana", UserRole.Customer, null), profile);
+        Assert.Equal(new UserProfile(registered.Profile.Id, "Ana", UserRole.Customer, null, "ana@example.com"), profile);
     }
 }

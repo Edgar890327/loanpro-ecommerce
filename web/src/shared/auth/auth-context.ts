@@ -5,6 +5,7 @@ export type UserRole = 'Admin' | 'Customer'
 export type SessionUser = {
   id: string
   fullName: string
+  email: string
   role: UserRole
   preferredLocale: string | null
 }

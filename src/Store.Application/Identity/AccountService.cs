@@ -61,7 +61,7 @@ public sealed class AccountService(
     }
 
     private static UserProfile ToProfile(User user) =>
-        new(user.Id, user.FullName, user.Role, user.PreferredLocale);
+        new(user.Id, user.FullName, user.Role, user.PreferredLocale, user.Email);
 
     private static string? NormalizeLocale(string? locale) =>
         locale is "es" or "en-US" ? locale : null;

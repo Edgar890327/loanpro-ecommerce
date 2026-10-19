@@ -155,18 +155,28 @@ public sealed class ProductAdminEndpointTests(PostgreSqlFixture fixture) : IClas
             Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
         }
 
+        using var customerClient = factory.CreateClient();
+        await AuthTestClient.RegisterCustomerAsync(customerClient);
+        var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<StoreDbContext>>();
+        Guid customerId;
+        await using (var lookup = await contextFactory.CreateDbContextAsync())
+        {
+            customerId = await lookup.Users.Where(user => user.Role == UserRole.Customer)
+                .Select(user => user.Id).FirstAsync();
+        }
+
         var order = new Order(
+            customerId,
+            $"ORD-2026-{Random.Shared.Next(100000, 999999)}",
             Guid.NewGuid().ToString("N"),
             Guid.NewGuid().ToString("N"),
-            "History customer",
             "history@example.test",
-            "1 Test Street",
+            new ShippingAddress("History customer", "1 Test Street", null, "Austin", "TX", "73301", "US"),
             Array.Empty<OrderItem>(),
             3.50m,
             DateTime.UtcNow,
             DateTime.UtcNow.AddMinutes(15));
         Assert.True(order.MarkPaid(DateTime.UtcNow));
-        var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<StoreDbContext>>();
         await using (var database = await contextFactory.CreateDbContextAsync())
         {
             database.Orders.Add(order);

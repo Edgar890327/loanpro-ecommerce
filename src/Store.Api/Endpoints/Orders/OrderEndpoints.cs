@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Store.Api.Auth;
 using Store.Application;
 
 namespace Store.Api.Orders;
@@ -16,28 +18,28 @@ public static class OrderEndpoints
             .ProducesValidationProblem();
 
         endpoints.MapPost("/api/orders", CreateAsync)
-            .AllowAnonymous()
-            .WithName("CreateGuestOrder")
-            .WithSummary("Create a guest order and reserve inventory")
-            .WithDescription("Creates an idempotent guest order and reserves all requested inventory atomically.")
+            .RequireAuthorization(AuthorizationPolicies.CustomerOnly)
+            .WithName("CreateOrder")
+            .WithSummary("Create an order for the signed-in customer and reserve inventory")
+            .WithDescription("Creates an order idempotent per customer and key, and reserves all requested inventory atomically.")
             .Produces<OrderResponse>(StatusCodes.Status201Created)
             .Produces<OrderResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
 
         endpoints.MapGet("/api/orders/{id:guid}", GetAsync)
-            .AllowAnonymous()
+            .RequireAuthorization(AuthorizationPolicies.CustomerOnly)
             .WithName("GetOrderStatus")
-            .WithSummary("Get public order status")
-            .WithDescription("Returns order state and totals without exposing guest contact details.")
+            .WithSummary("Get one of the signed-in customer's orders")
+            .WithDescription("Returns the order only to its owner; any other order responds 404.")
             .Produces<OrderResponse>()
             .Produces(StatusCodes.Status404NotFound);
 
         endpoints.MapPost("/api/orders/{id:guid}/cancel", CancelAsync)
-            .AllowAnonymous()
-            .WithName("CancelGuestOrder")
-            .WithSummary("Cancel a reserved guest order")
-            .WithDescription("Requires the order's original idempotency key as an order-access capability.")
+            .RequireAuthorization(AuthorizationPolicies.CustomerOnly)
+            .WithName("CancelOrder")
+            .WithSummary("Cancel a reserved order of the signed-in customer")
+            .WithDescription("Releases the reservation. Orders of other customers respond 404.")
             .Produces<OrderResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
@@ -61,10 +63,16 @@ public static class OrderEndpoints
     private static async Task<IResult> CreateAsync(
         CheckoutRequest request,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        ClaimsPrincipal user,
         IOrderService orders,
         CancellationToken cancellationToken)
     {
-        var input = request.ToInput();
+        if (user.GetUserId() is not { } customerId)
+        {
+            return Results.Unauthorized();
+        }
+
+        var input = request.ToInput(customerId);
         var errors = CheckoutValidator.Validate(input).ToDictionary(
             pair => pair.Key,
             pair => pair.Value,
@@ -87,6 +95,7 @@ public static class OrderEndpoints
                 OrderResponse.From(result.Order)),
             OrderOutcome.Existing => Results.Ok(OrderResponse.From(result.Order!)),
             OrderOutcome.OutOfStock => StockConflict(result.Issues),
+            OrderOutcome.NotFound => Results.Unauthorized(),
             OrderOutcome.AmountOutOfRange => Problem(
                 StatusCodes.Status400BadRequest,
                 "order_amount_out_of_range",
@@ -102,10 +111,16 @@ public static class OrderEndpoints
 
     private static async Task<IResult> GetAsync(
         Guid id,
+        ClaimsPrincipal user,
         IOrderService orders,
         CancellationToken cancellationToken)
     {
-        var order = await orders.GetAsync(id, cancellationToken);
+        if (user.GetUserId() is not { } customerId)
+        {
+            return Results.Unauthorized();
+        }
+
+        var order = await orders.GetAsync(id, customerId, cancellationToken);
         return order is null
             ? Results.NotFound()
             : Results.Ok(OrderResponse.From(order));
@@ -113,19 +128,16 @@ public static class OrderEndpoints
 
     private static async Task<IResult> CancelAsync(
         Guid id,
-        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        ClaimsPrincipal user,
         IOrderService orders,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 16 or > 200)
+        if (user.GetUserId() is not { } customerId)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["Idempotency-Key"] = ["The order's original idempotency key is required."]
-            });
+            return Results.Unauthorized();
         }
 
-        var result = await orders.CancelAsync(id, idempotencyKey, cancellationToken);
+        var result = await orders.CancelAsync(id, customerId, cancellationToken);
         return result.Outcome switch
         {
             OrderOutcome.Created => Results.Ok(OrderResponse.From(result.Order!)),

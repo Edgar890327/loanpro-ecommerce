@@ -20,6 +20,7 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         await SetSimulatedModeAsync(adminClient, SimulatedPaymentOptions.ApproveMode);
         var product = await CreateProductAsync(adminClient, 3);
         using var client = factory.CreateClient();
+        await AuthTestClient.RegisterCustomerAsync(client);
         var capability = NewCapability();
         var order = await CreateOrderAsync(client, product.Id, capability);
 
@@ -80,6 +81,7 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         await SetSimulatedModeAsync(adminClient, SimulatedPaymentOptions.RejectMode);
         var product = await CreateProductAsync(adminClient, 1);
         using var client = factory.CreateClient();
+        await AuthTestClient.RegisterCustomerAsync(client);
         var capability = NewCapability();
         var order = await CreateOrderAsync(client, product.Id, capability);
 
@@ -116,6 +118,7 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         await SetSimulatedModeAsync(adminClient, SimulatedPaymentOptions.ApproveMode);
         var product = await CreateProductAsync(adminClient, 1);
         using var client = factory.CreateClient();
+        await AuthTestClient.RegisterCustomerAsync(client);
         var capability = NewCapability();
         var order = await CreateOrderAsync(client, product.Id, capability);
 
@@ -231,9 +234,15 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         {
             Content = JsonContent.Create(new
             {
-                customerName = "Guest",
-                customerEmail = "guest@example.test",
-                shippingAddress = "1 Test Street",
+                shippingAddress = new
+                {
+                    recipientName = "Buyer",
+                    line1 = "1 Test Street",
+                    city = "Austin",
+                    region = "TX",
+                    postalCode = "73301",
+                    country = "US"
+                },
                 items = new[] { new { productId, quantity = 1 } }
             })
         };

@@ -33,8 +33,8 @@ function renderGuard(user: SessionUser | null, role: 'Admin' | 'Customer', isLoa
   )
 }
 
-const customer: SessionUser = { id: '1', fullName: 'Ana', role: 'Customer', preferredLocale: null }
-const admin: SessionUser = { id: '2', fullName: 'Root', role: 'Admin', preferredLocale: null }
+const customer: SessionUser = { id: '1', fullName: 'Ana', email: 'user@example.com', role: 'Customer', preferredLocale: null }
+const admin: SessionUser = { id: '2', fullName: 'Root', email: 'user@example.com', role: 'Admin', preferredLocale: null }
 
 describe('role guard', () => {
   afterEach(cleanup)

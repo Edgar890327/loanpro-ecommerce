@@ -11,15 +11,15 @@ public interface IOrderService
         string idempotencyKey,
         CancellationToken cancellationToken);
 
-    Task<OrderView?> GetAsync(Guid orderId, CancellationToken cancellationToken);
+    Task<OrderView?> GetAsync(Guid orderId, Guid customerId, CancellationToken cancellationToken);
 
     Task<OrderServiceResult> CancelAsync(
         Guid orderId,
-        string idempotencyKey,
+        Guid customerId,
         CancellationToken cancellationToken);
 
     Task<OrderServiceResult> FailAsync(
         Guid orderId,
-        string idempotencyKey,
+        Guid customerId,
         CancellationToken cancellationToken);
 }

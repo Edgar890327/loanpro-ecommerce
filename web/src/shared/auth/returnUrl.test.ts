@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { SessionUser } from './auth-context'
 import { resolveReturnUrl } from './returnUrl'
 
-const customer: SessionUser = { id: '1', fullName: 'Ana', role: 'Customer', preferredLocale: null }
-const admin: SessionUser = { id: '2', fullName: 'Root', role: 'Admin', preferredLocale: null }
+const customer: SessionUser = { id: '1', fullName: 'Ana', email: 'user@example.com', role: 'Customer', preferredLocale: null }
+const admin: SessionUser = { id: '2', fullName: 'Root', email: 'user@example.com', role: 'Admin', preferredLocale: null }
 
 describe('resolveReturnUrl', () => {
   it('sends admins to the administration area', () => {
