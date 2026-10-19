@@ -13,9 +13,19 @@ An enterprise e-commerce application built with .NET 10, PostgreSQL, and React. 
 From the repository root:
 
 ```sh
-cp .env.example .env
-docker compose up --build
+docker compose --env-file .env.dev up --build
 ```
+
+Ready-to-run environment files are checked in:
+
+| File | Use | Administrator login |
+|---|---|---|
+| `.env.dev` | Local development and evaluation | `admin@example.com` / `Admin-local-123` |
+| `.env.prod` | Production-like run (shorter sessions, flat shipping 5.00) | `admin@example.com` / `Admin-prod-Chg-7391` |
+
+Use `docker compose --env-file .env.prod up --build -d` for the production-like profile. `.env.example` documents every variable for custom setups (`cp .env.example .env`). The administrator is only seeded when it does not exist, so after changing `ADMIN_PASSWORD` run `docker compose down -v` first or the previous password stays active.
+
+The values in `.env.dev` and `.env.prod` are demo credentials so the repository runs out of the box. Rotate `ADMIN_PASSWORD`, `JWT_SECRET`, and `POSTGRES_PASSWORD` before any real deployment, and keep real secrets out of version control.
 
 Compose starts PostgreSQL, waits for its health check, then starts the API. The API applies EF Core migrations before accepting requests and serves the React build from `wwwroot`.
 
@@ -23,7 +33,7 @@ Compose starts PostgreSQL, waits for its health check, then starts the API. The 
 - Health check: <http://localhost:8080/health>
 - Swagger UI: <http://localhost:8080/swagger>
 
-The checked-in `.env.example` values are local development placeholders. Replace `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and the JWT secret in `.env` before using those settings in a real environment. Compose connects to the database by its `db` service name; the localhost connection string in `.env.example` is for running the API from the host.
+The checked-in env files contain demo values only. Compose connects to the database by its `db` service name; the localhost connection string in `.env.example` is for running the API from the host.
 
 Stop the stack with `docker compose down`. Add `--volumes` only when you intentionally want to delete the local PostgreSQL data.
 
@@ -42,7 +52,7 @@ In another terminal from the repository root, configure the local database conne
 ```sh
 export ConnectionStrings__DefaultConnection='Host=localhost;Port=5432;Database=store;Username=store;Password=store-local-only'
 export ADMIN_EMAIL='admin@example.com'
-export ADMIN_PASSWORD='replace-before-use'
+export ADMIN_PASSWORD='Admin-local-123'
 export JWT_SECRET='replace-with-a-random-secret-of-at-least-32-characters'
 export ASPNETCORE_URLS=http://localhost:8080
 dotnet run --project src/Store.Api/Store.Api.csproj --no-launch-profile
