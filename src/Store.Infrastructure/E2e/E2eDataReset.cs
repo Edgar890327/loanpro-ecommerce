@@ -36,6 +36,10 @@ public sealed class E2eDataReset(
                 """,
                 cancellationToken);
 
+            await database.Database.ExecuteSqlRawAsync(
+                """DELETE FROM "Users" WHERE "Role" <> 'Admin'""",
+                cancellationToken);
+
             var fixture = await ReadFixtureAsync(cancellationToken);
             var now = timeProvider.GetUtcNow().UtcDateTime;
             var categories = new Dictionary<string, Category>(StringComparer.Ordinal);

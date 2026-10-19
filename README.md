@@ -105,7 +105,35 @@ The PostgreSQL integration tests use Testcontainers and require a working Docker
 
 ## End-to-end tests
 
-The Playwright suite contains 16 serial scenarios, each named with its catalog ID: E2E-01 admin login, E2E-02 product CRUD, E2E-03 catalog search/filter/shareable pagination, E2E-04 simulated purchase, E2E-05 declined payment, E2E-06 PayPal with stubs, E2E-07 active provider switching, E2E-08 shipping changes and frozen order totals, E2E-09 bilingual locale persistence, E2E-10 CSV golden import, E2E-11 duplicate SKU and confirmed reimport, E2E-12 stock limits, E2E-13 reservation expiry, E2E-14 last-unit concurrency, E2E-15 safe rendering of malicious-looking text, and E2E-16 admin order history.
+The Playwright suite contains 23 serial scenarios, each named with its catalog ID:
+
+| ID | Scenario |
+|---|---|
+| E2E-01 | Admin login with email and password |
+| E2E-02 | Product CRUD |
+| E2E-03 | Catalog search, filters, and shareable pagination |
+| E2E-04 | Simulated-provider purchase by an authenticated customer |
+| E2E-05 | Declined simulated payment |
+| E2E-06 | PayPal purchase with SDK and API stubs |
+| E2E-07 | Active payment provider switching |
+| E2E-08 | Shipping changes affect only new orders |
+| E2E-09 | Bilingual locale persistence |
+| E2E-10 | CSV preview and golden import |
+| E2E-11 | Duplicate SKU aggregation and confirmed reimport |
+| E2E-12 | Cart quantity limits and server inventory validation |
+| E2E-13 | Reservation expiry releases inventory and blocks payment |
+| E2E-14 | Two customers in separate browser contexts compete for the last unit |
+| E2E-15 | Safe rendering of malicious-looking text |
+| E2E-16 | Admin order history shows the customer name |
+| E2E-17 | Registration from checkout: a visitor with a cart clicks to checkout, registers, returns to checkout, and the cart is intact |
+| E2E-18 | Invalid credentials and duplicate email: clear messages, and login does not reveal whether an email exists |
+| E2E-19 | My purchases: search by number, product, and SKU, filter by status and date, and clear filters |
+| E2E-20 | Isolation: a customer opening another customer's purchase gets 404 and does not see it in the list |
+| E2E-21 | Role access: a customer cannot enter admin routes and the admin cannot complete purchases |
+| E2E-22 | Sign out: afterwards checkout asks for login again |
+| E2E-23 | CSRF defense (API test): a POST without the custom header returns 403 |
+
+`POST /e2e/reset` (mapped only when `E2E_MODE=true`) truncates data, reloads the base product fixture, and keeps only the seeded admin; it creates no customers. Playwright fixtures in `e2e/support/fixtures.ts` provide `registerCustomer` (through the API) and `loginAs(role)`, which saves a per-role `storageState` in `e2e/.auth/` (git-ignored) so every scenario starts from a clean session. API requests made with Playwright's `request` send the `X-Requested-With: store` header.
 
 ### Run the complete suite in Docker
 
@@ -154,7 +182,7 @@ npm run report
 
 The tests intercept the PayPal JavaScript SDK in the browser and send backend Orders API calls to the local stub; no real PayPal account or sandbox credentials are needed. A manual real-sandbox test requires PayPal sandbox credentials entered through Admin → Settings, with the sandbox option enabled and the real PayPal API URL left configured.
 
-The Playwright config records traces, screenshots, and videos only for failed tests, and writes an HTML report. `CI=true` enables one retry and forbids focused tests. E2E-only environment variables are `E2E_MODE` (must be true to map the reset endpoint), `E2E_ADMIN_PASSWORD`, `E2E_JWT_SECRET`, `E2E_BASE_URL`, and `PAYPAL_API_BASE_URL` (the E2E overlay points it to the stub). The checked-in Compose defaults are local-only placeholders, not production credentials.
+The Playwright config records traces, screenshots, and videos only for failed tests, and writes an HTML report. `CI=true` enables one retry and forbids focused tests. E2E-only environment variables are `E2E_MODE` (must be true to map the reset endpoint), `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_JWT_SECRET`, `E2E_BASE_URL`, and `PAYPAL_API_BASE_URL` (the E2E overlay points it to the stub). The checked-in Compose defaults are local-only placeholders, not production credentials.
 
 ## Test commands
 
@@ -171,7 +199,7 @@ To add a shipping strategy, implement `IShippingStrategy`, describe its schema, 
 
 ## Known limitations
 
-The application has no customer accounts/authentication, tax calculation, payment webhooks, multi-currency support, or refunds. PayPal E2E coverage uses deterministic local doubles rather than a live sandbox.
+The application has no email verification or password recovery, tax calculation, payment webhooks, multi-currency support, or refunds. PayPal E2E coverage uses deterministic local doubles rather than a live sandbox.
 
 ## Sample CSV provenance
 
@@ -185,6 +213,7 @@ AI assistance was used to implement and review portions of this challenge. The f
 
 | Concern | Chosen approach | Alternative considered | Reason |
 |---|---|---|---|
+| Identity | Single `users` table, HttpOnly SameSite=Lax cookie JWT, custom-header CSRF defense | Separate admin/customer stores, tokens in `localStorage`, or CSRF tokens | One login path for both roles, tokens unreachable from scripts, and a stateless CSRF check that needs no server-side token store. |
 | Error persistence | Bounded `Channel<ErrorLog>` and batch worker with independent contexts | PostgreSQL Serilog sink or writing through the request `DbContext` | Keeps the required schema and request path independent of batch persistence failures and request transactions. |
 | Product concurrency | PostgreSQL `xmin` optimistic token | Application-managed integer version | PostgreSQL already changes `xmin` on updates, avoiding a second counter. |
 | Catalog search | Accent-normalized substring text with `pg_trgm` GIN index | Full-text search or unindexed `ILIKE` | Preserves substring matching across name/SKU/description while indexing typical searches. |

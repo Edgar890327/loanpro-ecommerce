@@ -221,10 +221,19 @@ public sealed class ProductAdminEndpointTests(PostgreSqlFixture fixture) : IClas
 
         using var e2eFactory = new TestApiFactory(fixture, e2eMode: true);
         using var e2eClient = e2eFactory.CreateClient();
+        using var customerClient = e2eFactory.CreateClient();
+        await AuthTestClient.RegisterCustomerAsync(customerClient);
         using var resetResponse = await e2eClient.PostAsync("/e2e/reset", null);
         Assert.Equal(HttpStatusCode.NoContent, resetResponse.StatusCode);
 
         await AuthTestClient.SignInAsync(e2eClient, TestApiFactory.AdminEmail, e2eFactory.AdminPassword);
+        var contextFactory = e2eFactory.Services.GetRequiredService<IDbContextFactory<StoreDbContext>>();
+        await using (var database = await contextFactory.CreateDbContextAsync())
+        {
+            Assert.Empty(await database.Users.Where(user => user.Role == UserRole.Customer).ToListAsync());
+            Assert.Single(await database.Users.Where(user => user.Role == UserRole.Admin).ToListAsync());
+        }
+
         using var catalogResponse = await e2eClient.GetAsync("/api/catalog?q=E2E-ESPRESSO");
         Assert.Equal(HttpStatusCode.OK, catalogResponse.StatusCode);
         using var catalog = await JsonDocument.ParseAsync(
