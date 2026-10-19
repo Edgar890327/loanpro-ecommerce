@@ -23,10 +23,10 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-store};Username=${POSTGRES_USER:-store};Password=${POSTGRES_PASSWORD:-store-local-only}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-replace-before-use}
-      AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-10}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin-local-123}
+      AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-30}
       AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-store_session}
-      JWT_SECRET: ${JWT_SECRET:-replace-with-a-random-secret-of-at-least-32-characters}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-change-me-0123456789abcdef}
       JWT_EXPIRY_MINUTES: ${JWT_EXPIRY_MINUTES:-30}
       RESERVATION_TTL_MINUTES: ${RESERVATION_TTL_MINUTES:-15}
       RESERVATION_TTL_SECONDS: ${RESERVATION_TTL_SECONDS:-}

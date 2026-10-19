@@ -13,8 +13,10 @@ An enterprise e-commerce application built with .NET 10, PostgreSQL, and React. 
 From the repository root:
 
 ```sh
-docker compose --env-file .env.dev up --build
+docker compose up --build
 ```
+
+**The environment currently running and documented as the default is `.env.dev`.** The defaults in `docker-compose.yml` match `.env.dev`, so a plain `docker compose up --build` behaves exactly like `docker compose --env-file .env.dev up --build`. Sign in at <http://localhost:8080/login> with `admin@example.com` / `Admin-local-123`.
 
 Ready-to-run environment files are checked in:
 
