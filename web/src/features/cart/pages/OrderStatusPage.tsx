@@ -26,11 +26,9 @@ export function OrderStatusPage() {
     enabled: order.data?.state === 'Reserved',
     retry: false,
   })
-  const accessKey = id ? window.localStorage.getItem(`store:order-access:${id}`) : null
   const cancel = useMutation({
     mutationFn: () => apiRequest<Order>(`/api/orders/${id}/cancel`, {
       method: 'POST',
-      headers: { 'Idempotency-Key': accessKey ?? '' },
     }),
     onSuccess: (result) => queryClient.setQueryData(['order', id], result),
   })
@@ -50,7 +48,7 @@ export function OrderStatusPage() {
   }
 
   const remaining = Math.max(0, Math.ceil((Date.parse(order.data.reservedUntilUtc) - now) / 1000))
-  const canCancel = order.data.state === 'Reserved' && Boolean(accessKey)
+  const canCancel = order.data.state === 'Reserved'
   return (
     <section className="panel order-status">
       <p className="eyebrow">{t('orderStatus')}</p>
@@ -58,14 +56,13 @@ export function OrderStatusPage() {
       <p>{t('orderReference', { number: order.data.orderNumber })}</p>
       {order.data.state === 'Reserved' && <p role="timer">{t('reservationCountdown', { minutes: formatNumber(Math.floor(remaining / 60), i18n.language, 0), seconds: String(remaining % 60).padStart(2, '0') })}</p>}
       {order.data.state === 'Reserved' && remaining === 0 && <p role="status">{t('reservationFinishing')}</p>}
-      {order.data.state === 'Reserved' && accessKey && (
+      {order.data.state === 'Reserved' && (
         <section aria-label={t('paymentSection')}>
           <h2>{t('paymentSection')}</h2>
           {provider.isLoading && <p role="status">{t('paymentLoading')}</p>}
           {provider.isError && <p role="alert">{translateApiError(provider.error, t, 'paymentProviderUnavailable')}</p>}
           {provider.data && <PaymentCheckout
             orderId={order.data.id}
-            capability={accessKey}
             provider={provider.data}
             onCaptured={refreshOrder}
           />}

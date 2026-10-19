@@ -4,12 +4,12 @@ public interface IPaymentService
 {
     Task<PaymentServiceResult> CreateAsync(
         Guid orderId,
-        string orderCapability,
+        Guid customerId,
         CancellationToken cancellationToken);
 
     Task<PaymentServiceResult> CaptureAsync(
         Guid orderId,
-        string orderCapability,
+        Guid customerId,
         string externalReference,
         CancellationToken cancellationToken);
 }

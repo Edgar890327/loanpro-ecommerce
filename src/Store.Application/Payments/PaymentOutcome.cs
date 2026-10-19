@@ -8,7 +8,6 @@ public enum PaymentOutcome
     Failed,
     Pending,
     NotFound,
-    InvalidCapability,
     Expired,
     AlreadyFinalized,
     ProviderUnavailable,

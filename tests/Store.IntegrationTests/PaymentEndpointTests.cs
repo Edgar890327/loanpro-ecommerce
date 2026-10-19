@@ -31,7 +31,6 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         Assert.DoesNotContain("clientSecret", providerJson, StringComparison.OrdinalIgnoreCase);
 
         using var paymentRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/orders/{order.Id}/payment");
-        paymentRequest.Headers.Add("Idempotency-Key", capability);
         using var paymentResponse = await client.SendAsync(paymentRequest);
         Assert.Equal(HttpStatusCode.OK, paymentResponse.StatusCode);
         var payment = await paymentResponse.Content.ReadFromJsonAsync<PaymentCreated>();
@@ -43,7 +42,6 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         {
             Content = JsonContent.Create(new { externalReference = payment!.ExternalReference })
         };
-        captureRequest.Headers.Add("Idempotency-Key", capability);
         using var captureResponse = await client.SendAsync(captureRequest);
         Assert.Equal(HttpStatusCode.OK, captureResponse.StatusCode);
         var capture = await captureResponse.Content.ReadFromJsonAsync<PaymentCaptured>();
@@ -56,7 +54,6 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         {
             Content = JsonContent.Create(new { externalReference = payment.ExternalReference })
         };
-        retryRequest.Headers.Add("Idempotency-Key", capability);
         using var retryResponse = await client.SendAsync(retryRequest);
         Assert.Equal(HttpStatusCode.OK, retryResponse.StatusCode);
 
@@ -86,7 +83,6 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         var order = await CreateOrderAsync(client, product.Id, capability);
 
         using var paymentRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/orders/{order.Id}/payment");
-        paymentRequest.Headers.Add("Idempotency-Key", capability);
         using var paymentResponse = await client.SendAsync(paymentRequest);
         var payment = await paymentResponse.Content.ReadFromJsonAsync<PaymentCreated>();
         Assert.Equal(HttpStatusCode.OK, paymentResponse.StatusCode);
@@ -97,7 +93,6 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         {
             Content = JsonContent.Create(new { externalReference = payment!.ExternalReference })
         };
-        captureRequest.Headers.Add("Idempotency-Key", capability);
         using var captureResponse = await client.SendAsync(captureRequest);
         var capture = await captureResponse.Content.ReadFromJsonAsync<PaymentCaptured>();
         Assert.Equal(HttpStatusCode.OK, captureResponse.StatusCode);
@@ -123,7 +118,6 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         var order = await CreateOrderAsync(client, product.Id, capability);
 
         using var paymentRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/orders/{order.Id}/payment");
-        paymentRequest.Headers.Add("Idempotency-Key", capability);
         using var paymentResponse = await client.SendAsync(paymentRequest);
         var payment = await paymentResponse.Content.ReadFromJsonAsync<PaymentCreated>();
         Assert.Equal(HttpStatusCode.OK, paymentResponse.StatusCode);
@@ -135,7 +129,6 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         {
             Content = JsonContent.Create(new { externalReference = payment!.ExternalReference })
         };
-        captureRequest.Headers.Add("Idempotency-Key", capability);
         using var captureResponse = await client.SendAsync(captureRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, captureResponse.StatusCode);
@@ -197,6 +190,53 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         var setting = await database.PaymentProviderSettings.SingleAsync(item => item.ProviderKey == "paypal");
         Assert.DoesNotContain("secret-not-for-response", setting.ProtectedSecrets, StringComparison.Ordinal);
         Assert.Equal(1, await database.PaymentProviderSettings.CountAsync(item => item.IsActive));
+    }
+
+    [Theory]
+    [InlineData("simulated")]
+    [InlineData("paypal")]
+    public async Task PaymentEndpointsOnlyServeTheOwningCustomer(string providerKey)
+    {
+        using var factory = new TestApiFactory(fixture);
+        using var adminClient = factory.CreateClient();
+        await SignInAsync(adminClient, factory.AdminPassword);
+        await SetSimulatedModeAsync(adminClient, SimulatedPaymentOptions.ApproveMode);
+        if (providerKey == "paypal")
+        {
+            using var activate = await adminClient.PutAsJsonAsync(
+                "/api/admin/payment-providers/paypal",
+                new
+                {
+                    publicConfiguration = new { clientId = "public-client-id", sandbox = "true" },
+                    secrets = new { clientSecret = "secret-value" },
+                    activate = true
+                });
+            Assert.Equal(HttpStatusCode.OK, activate.StatusCode);
+        }
+
+        var product = await CreateProductAsync(adminClient, 2);
+        using var owner = factory.CreateClient();
+        await AuthTestClient.RegisterCustomerAsync(owner);
+        using var stranger = factory.CreateClient();
+        await AuthTestClient.RegisterCustomerAsync(stranger);
+        using var anonymous = factory.CreateClient();
+        var order = await CreateOrderAsync(owner, product.Id, NewCapability());
+        var capture = JsonContent.Create(new { externalReference = "any-reference" });
+
+        using var foreignCreate = await stranger.PostAsync($"/api/orders/{order.Id}/payment", null);
+        using var foreignCapture = await stranger.PostAsync($"/api/orders/{order.Id}/payment/capture", capture);
+        using var adminCreate = await adminClient.PostAsync($"/api/orders/{order.Id}/payment", null);
+        using var adminCapture = await adminClient.PostAsync($"/api/orders/{order.Id}/payment/capture", JsonContent.Create(new { externalReference = "any-reference" }));
+        using var anonymousCreate = await anonymous.PostAsync($"/api/orders/{order.Id}/payment", null);
+
+        Assert.Equal(HttpStatusCode.NotFound, foreignCreate.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, foreignCapture.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, adminCreate.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, adminCapture.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousCreate.StatusCode);
+        var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<StoreDbContext>>();
+        await using var database = await contextFactory.CreateDbContextAsync();
+        Assert.Equal(0, await database.Payments.CountAsync(item => item.OrderId == order.Id));
     }
 
     private static async Task SetSimulatedModeAsync(HttpClient adminClient, string mode)

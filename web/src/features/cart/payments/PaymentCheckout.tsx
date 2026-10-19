@@ -6,7 +6,6 @@ import type { PaymentProvider } from './paymentTypes'
 
 type CheckoutProps = {
   orderId: string
-  capability: string
   clientId?: string
   onCaptured: () => void
 }
@@ -20,7 +19,7 @@ const checkoutComponents: Record<string, ComponentType<CheckoutProps>> = {
   paypal: PayPalCheckout,
 }
 
-export function PaymentCheckout({ orderId, capability, provider, onCaptured }: Props) {
+export function PaymentCheckout({ orderId, provider, onCaptured }: Props) {
   const { t } = useTranslation()
   const Checkout = checkoutComponents[provider.key]
 
@@ -29,7 +28,6 @@ export function PaymentCheckout({ orderId, capability, provider, onCaptured }: P
   return (
     <Checkout
       orderId={orderId}
-      capability={capability}
       clientId={provider.publicConfiguration.clientId}
       onCaptured={onCaptured}
     />

@@ -52,7 +52,6 @@ describe('payment checkout registry', () => {
     render(
       <PaymentCheckout
         orderId="order-1"
-        capability="order-capability-1234567890"
         provider={simulated}
         onCaptured={onCaptured}
       />,
@@ -64,8 +63,7 @@ describe('payment checkout registry', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(String(fetchMock.mock.calls[0][0])).toBe('/api/orders/order-1/payment')
     expect(String(fetchMock.mock.calls[1][0])).toBe('/api/orders/order-1/payment/capture')
-    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Idempotency-Key'))
-      .toBe('order-capability-1234567890')
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Idempotency-Key')).toBeNull()
   })
 
   it('uses the PayPal SDK createOrder and onApprove callbacks', async () => {
@@ -96,7 +94,6 @@ describe('payment checkout registry', () => {
     render(
       <PaymentCheckout
         orderId="order-2"
-        capability="paypal-capability-123456"
         provider={paypal}
         onCaptured={onCaptured}
       />,
@@ -119,7 +116,6 @@ describe('payment checkout registry', () => {
     render(
       <PaymentCheckout
         orderId="order-3"
-        capability="order-capability-1234567890"
         provider={{ ...simulated, key: 'unknown' }}
         onCaptured={vi.fn()}
       />,

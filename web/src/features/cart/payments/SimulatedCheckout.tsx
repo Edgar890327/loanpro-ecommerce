@@ -5,12 +5,11 @@ import { translateApiError } from '../../../shared/api/api'
 
 type Props = {
   orderId: string
-  capability: string
   clientId?: string
   onCaptured: () => void
 }
 
-export function SimulatedCheckout({ orderId, capability, onCaptured }: Props) {
+export function SimulatedCheckout({ orderId, onCaptured }: Props) {
   const { t } = useTranslation()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
@@ -24,8 +23,8 @@ export function SimulatedCheckout({ orderId, capability, onCaptured }: Props) {
     setPending(true)
     setError('')
     try {
-      const payment = await createPayment(orderId, capability)
-      const result = await capturePayment(orderId, capability, payment.externalReference)
+      const payment = await createPayment(orderId)
+      const result = await capturePayment(orderId, payment.externalReference)
       if (result.paymentStatus === 'Approved' || result.paymentStatus === 'Failed') {
         onCaptured()
       } else {

@@ -24,12 +24,11 @@ declare global {
 
 type Props = {
   orderId: string
-  capability: string
   clientId?: string
   onCaptured: () => void
 }
 
-export function PayPalCheckout({ orderId, capability, clientId = '', onCaptured }: Props) {
+export function PayPalCheckout({ orderId, clientId = '', onCaptured }: Props) {
   const { t } = useTranslation()
   const container = useRef<HTMLDivElement>(null)
   const externalReference = useRef<string | null>(null)
@@ -54,7 +53,7 @@ export function PayPalCheckout({ orderId, capability, clientId = '', onCaptured 
         void window.paypal.Buttons({
           createOrder: async () => {
             try {
-              const payment = await createPayment(orderId, capability)
+              const payment = await createPayment(orderId)
               externalReference.current = payment.externalReference
               return payment.externalReference
             } catch (reason) {
@@ -70,7 +69,7 @@ export function PayPalCheckout({ orderId, capability, clientId = '', onCaptured 
             }
 
             try {
-              const result = await capturePayment(orderId, capability, reference)
+              const result = await capturePayment(orderId, reference)
               if (result.paymentStatus === 'Approved' || result.paymentStatus === 'Failed') {
                 onCaptured()
               } else {
@@ -119,7 +118,7 @@ export function PayPalCheckout({ orderId, capability, clientId = '', onCaptured 
       if (script?.parentElement) script.remove()
       buttonsContainer?.replaceChildren()
     }
-  }, [capability, clientId, onCaptured, orderId])
+  }, [clientId, onCaptured, orderId])
 
   return (
     <div className="payment-checkout">

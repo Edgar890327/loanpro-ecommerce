@@ -18,7 +18,7 @@ public sealed class PaymentService(
 {
     public async Task<PaymentServiceResult> CreateAsync(
         Guid orderId,
-        string orderCapability,
+        Guid customerId,
         CancellationToken cancellationToken)
     {
         await using var database = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -28,17 +28,11 @@ public sealed class PaymentService(
         var order = await database.Orders
             .Include(item => item.Items)
             .Include(item => item.Payments)
-            .SingleOrDefaultAsync(item => item.Id == orderId, cancellationToken);
+            .SingleOrDefaultAsync(item => item.Id == orderId && item.CustomerId == customerId, cancellationToken);
         if (order is null)
         {
             await transaction.RollbackAsync(cancellationToken);
             return Result(PaymentOutcome.NotFound);
-        }
-
-        if (!HasCapability(order, orderCapability))
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            return Result(PaymentOutcome.InvalidCapability);
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -113,7 +107,7 @@ public sealed class PaymentService(
 
     public async Task<PaymentServiceResult> CaptureAsync(
         Guid orderId,
-        string orderCapability,
+        Guid customerId,
         string externalReference,
         CancellationToken cancellationToken)
     {
@@ -124,17 +118,11 @@ public sealed class PaymentService(
         var order = await database.Orders
             .Include(item => item.Items)
             .Include(item => item.Payments)
-            .SingleOrDefaultAsync(item => item.Id == orderId, cancellationToken);
+            .SingleOrDefaultAsync(item => item.Id == orderId && item.CustomerId == customerId, cancellationToken);
         if (order is null)
         {
             await transaction.RollbackAsync(cancellationToken);
             return Result(PaymentOutcome.NotFound);
-        }
-
-        if (!HasCapability(order, orderCapability))
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            return Result(PaymentOutcome.InvalidCapability);
         }
 
         var payment = order.Payments.SingleOrDefault();
@@ -381,12 +369,4 @@ public sealed class PaymentService(
             item.Quantity,
             item.UnitPrice,
             item.Subtotal)).ToArray());
-
-    private static bool HasCapability(Order order, string capability)
-    {
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(capability.Trim())));
-        return CryptographicOperations.FixedTimeEquals(
-            Encoding.ASCII.GetBytes(order.IdempotencyKeyHash),
-            Encoding.ASCII.GetBytes(hash));
-    }
 }

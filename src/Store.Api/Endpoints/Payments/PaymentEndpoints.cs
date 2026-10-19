@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Store.Api.Auth;
 using Store.Application;
 
 namespace Store.Api.Payments;
@@ -16,17 +18,17 @@ public static class PaymentEndpoints
             .Produces(StatusCodes.Status404NotFound);
 
         endpoints.MapPost("/api/orders/{id:guid}/payment", CreateAsync)
-            .AllowAnonymous()
+            .RequireAuthorization(AuthorizationPolicies.CustomerOnly)
             .WithName("CreateOrderPayment")
             .WithSummary("Create a payment for a reserved order")
-            .WithDescription("Requires the original order idempotency capability.")
+            .WithDescription("Requires a customer session that owns the order.")
             .Produces<PaymentCreationResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status502BadGateway);
 
         endpoints.MapPost("/api/orders/{id:guid}/payment/capture", CaptureAsync)
-            .AllowAnonymous()
+            .RequireAuthorization(AuthorizationPolicies.CustomerOnly)
             .WithName("CaptureOrderPayment")
             .WithSummary("Capture a payment for a reserved order")
             .WithDescription("Captures through the payment provider and converts reserved inventory to sold inventory atomically.")
@@ -48,19 +50,16 @@ public static class PaymentEndpoints
 
     private static async Task<IResult> CreateAsync(
         Guid id,
-        [FromHeader(Name = "Idempotency-Key")] string? capability,
+        ClaimsPrincipal user,
         IPaymentService payments,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(capability) || capability.Length is < 16 or > 200)
+        if (user.GetUserId() is not { } customerId)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["Idempotency-Key"] = ["The original order idempotency key is required."]
-            });
+            return Results.Unauthorized();
         }
 
-        var result = await payments.CreateAsync(id, capability, cancellationToken);
+        var result = await payments.CreateAsync(id, customerId, cancellationToken);
         return result.Outcome switch
         {
             PaymentOutcome.Created or PaymentOutcome.Existing =>
@@ -72,30 +71,33 @@ public static class PaymentEndpoints
                 title: "Payment provider unavailable",
                 detail: "The payment could not be initialized. Retry the request.",
                 extensions: new Dictionary<string, object?> { ["code"] = "payment_provider_unavailable" }),
-            PaymentOutcome.InvalidCapability => Results.NotFound(),
-            _ => Results.NotFound()
+                        _ => Results.NotFound()
         };
     }
 
     private static async Task<IResult> CaptureAsync(
         Guid id,
-        [FromHeader(Name = "Idempotency-Key")] string? capability,
+        ClaimsPrincipal user,
         PaymentCaptureRequest request,
         IPaymentService payments,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(capability) || capability.Length is < 16 or > 200 ||
-            string.IsNullOrWhiteSpace(request.ExternalReference) || request.ExternalReference.Length > 128)
+        if (string.IsNullOrWhiteSpace(request.ExternalReference) || request.ExternalReference.Length > 128)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
-                ["payment"] = ["A valid order capability and payment reference are required."]
+                ["payment"] = ["A payment reference is required."]
             });
+        }
+
+        if (user.GetUserId() is not { } customerId)
+        {
+            return Results.Unauthorized();
         }
 
         var result = await payments.CaptureAsync(
             id,
-            capability,
+            customerId,
             request.ExternalReference,
             cancellationToken);
         return result.Outcome switch
@@ -114,7 +116,7 @@ public static class PaymentEndpoints
                 title: "Payment provider unavailable",
                 detail: "The payment could not be captured. Retry the request.",
                 extensions: new Dictionary<string, object?> { ["code"] = "payment_provider_unavailable" }),
-            PaymentOutcome.InvalidCapability or PaymentOutcome.NotFound => Results.NotFound(),
+            PaymentOutcome.NotFound => Results.NotFound(),
             _ => Results.NotFound()
         };
     }

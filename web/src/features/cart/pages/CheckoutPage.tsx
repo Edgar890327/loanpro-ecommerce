@@ -118,7 +118,6 @@ export function CheckoutPage() {
           items: cartLines,
         }),
       })
-      window.localStorage.setItem(`store:order-access:${order.id}`, idempotencyKey.current)
       idempotencyKey.current = null
       clear()
       navigate(`/orders/${order.id}`)
