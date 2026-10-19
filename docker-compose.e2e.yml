@@ -10,7 +10,10 @@ services:
       E2E_MODE: "true"
       RESERVATION_TTL_SECONDS: 12
       RESERVATION_SCAN_INTERVAL_SECONDS: 1
+      ADMIN_EMAIL: ${E2E_ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${E2E_ADMIN_PASSWORD:-e2e-admin-only-local}
+      AUTH_RATE_LIMIT_PER_MINUTE: 10000
+      AUTH_COOKIE_NAME: store_session
       JWT_SECRET: ${E2E_JWT_SECRET:-e2e-jwt-secret-not-for-production-change-this}
       PAYPAL_API_BASE_URL: http://paypal-stub:8081
     depends_on:

@@ -22,7 +22,10 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-store};Username=${POSTGRES_USER:-store};Password=${POSTGRES_PASSWORD:-store-local-only}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-replace-before-use}
+      AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-10}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-store_session}
       JWT_SECRET: ${JWT_SECRET:-replace-with-a-random-secret-of-at-least-32-characters}
       JWT_EXPIRY_MINUTES: ${JWT_EXPIRY_MINUTES:-15}
       RESERVATION_TTL_MINUTES: ${RESERVATION_TTL_MINUTES:-15}

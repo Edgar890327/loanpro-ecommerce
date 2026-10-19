@@ -18,6 +18,9 @@
 ## Conventions
 
 - Write code and documentation in English. Do not add source-code comments.
+- Identity: a `users` table with role Customer or Admin; the admin is seeded from `ADMIN_EMAIL` and `ADMIN_PASSWORD`; login is unified by email and password; the session is a short-lived JWT in an HttpOnly SameSite=Lax cookie, and data-modifying methods require a custom header.
+- Catalog, search, and shipping quote are public. Purchases require a Customer session: there is no guest checkout and the admin does not buy. Another customer's order responds 404, never 403.
+- Emails, passwords, tokens, and addresses never go to logs or ErrorLog.
 - Keep secrets in environment variables; update `.env.example` when adding configuration and never commit real credentials.
 - Preserve existing behavior and public API contracts during structural refactors. Update namespaces/imports and directly related documentation together with file moves.
 - Add or update focused tests for behavior changes. Finish a milestone with unit, integration, and frontend tests plus applicable lint/build checks passing before committing.
