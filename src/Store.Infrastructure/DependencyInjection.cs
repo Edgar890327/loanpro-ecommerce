@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Store.Application;
 using Store.Infrastructure.Catalog;
 using Store.Infrastructure.ErrorLogging;
+using Store.Infrastructure.E2e;
 using Store.Infrastructure.Importing;
 using Store.Infrastructure.Orders;
 using Store.Infrastructure.Payments;
@@ -56,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IShippingQuoteService, ShippingQuoteService>();
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<IOrderHistoryReader, OrderHistoryReader>();
+        services.AddScoped<IE2eDataReset, E2eDataReset>();
         var reservationTtlSeconds = configuration.GetValue<int?>("RESERVATION_TTL_SECONDS");
         var reservationTtlMinutes = configuration.GetValue<int>("RESERVATION_TTL_MINUTES", 15);
         var reservationOptions = new ReservationOptions

@@ -1,0 +1,137 @@
+[
+  {
+    "Name": "E2E Espresso",
+    "Sku": "E2E-ESPRESSO",
+    "Description": "Freshly roasted espresso beans for automated acceptance tests.",
+    "Category": "Coffee",
+    "Price": 12.50,
+    "Stock": 12,
+    "WeightKg": 0.5
+  },
+  {
+    "Name": "E2E Green Tea",
+    "Sku": "E2E-TEA",
+    "Description": "Green tea leaves for catalog filters and guest checkout.",
+    "Category": "Tea",
+    "Price": 8.25,
+    "Stock": 5,
+    "WeightKg": 0.25
+  },
+  {
+    "Name": "E2E Limited Mug",
+    "Sku": "E2E-MUG",
+    "Description": "A deliberately scarce product for inventory race tests.",
+    "Category": "Accessories",
+    "Price": 5.99,
+    "Stock": 1,
+    "WeightKg": 0.3
+  },
+  {
+    "Name": "<script>window.alert('xss')</script> Coffee",
+    "Sku": "E2E-XSS",
+    "Description": "Literal script-like markup must remain plain text.",
+    "Category": "Coffee",
+    "Price": 10.99,
+    "Stock": 4,
+    "WeightKg": 0.4
+  },
+  {
+    "Name": "Coffee ' OR 1=1 --",
+    "Sku": "E2E-SQL",
+    "Description": "SQL-like text must remain safe in search.",
+    "Category": "Coffee",
+    "Price": 14.75,
+    "Stock": 3,
+    "WeightKg": 0.45
+  },
+  {
+    "Name": "E2E Coffee Filter One",
+    "Sku": "E2E-FILTER-01",
+    "Description": "Reusable pour-over coffee filter.",
+    "Category": "Coffee",
+    "Price": 11.75,
+    "Stock": 8,
+    "WeightKg": 0.15
+  },
+  {
+    "Name": "E2E Coffee Filter Two",
+    "Sku": "E2E-FILTER-02",
+    "Description": "Reusable pour-over coffee filter.",
+    "Category": "Coffee",
+    "Price": 15.25,
+    "Stock": 8,
+    "WeightKg": 0.15
+  },
+  {
+    "Name": "E2E Coffee Filter Three",
+    "Sku": "E2E-FILTER-03",
+    "Description": "Reusable pour-over coffee filter.",
+    "Category": "Coffee",
+    "Price": 16.25,
+    "Stock": 8,
+    "WeightKg": 0.15
+  },
+  {
+    "Name": "E2E Coffee Filter Four",
+    "Sku": "E2E-FILTER-04",
+    "Description": "Reusable pour-over coffee filter.",
+    "Category": "Coffee",
+    "Price": 17.25,
+    "Stock": 8,
+    "WeightKg": 0.15
+  },
+  {
+    "Name": "E2E Coffee Filter Five",
+    "Sku": "E2E-FILTER-05",
+    "Description": "Reusable pour-over coffee filter.",
+    "Category": "Coffee",
+    "Price": 18.25,
+    "Stock": 8,
+    "WeightKg": 0.15
+  },
+  {
+    "Name": "E2E Tea Infuser One",
+    "Sku": "E2E-INFUSER-01",
+    "Description": "Stainless steel tea infuser.",
+    "Category": "Tea",
+    "Price": 6.50,
+    "Stock": 8,
+    "WeightKg": 0.1
+  },
+  {
+    "Name": "E2E Tea Infuser Two",
+    "Sku": "E2E-INFUSER-02",
+    "Description": "Stainless steel tea infuser.",
+    "Category": "Tea",
+    "Price": 7.50,
+    "Stock": 8,
+    "WeightKg": 0.1
+  },
+  {
+    "Name": "E2E Tea Infuser Three",
+    "Sku": "E2E-INFUSER-03",
+    "Description": "Stainless steel tea infuser.",
+    "Category": "Tea",
+    "Price": 8.50,
+    "Stock": 8,
+    "WeightKg": 0.1
+  },
+  {
+    "Name": "E2E Tea Infuser Four",
+    "Sku": "E2E-INFUSER-04",
+    "Description": "Stainless steel tea infuser.",
+    "Category": "Tea",
+    "Price": 9.50,
+    "Stock": 8,
+    "WeightKg": 0.1
+  },
+  {
+    "Name": "E2E Tea Infuser Five",
+    "Sku": "E2E-INFUSER-05",
+    "Description": "Stainless steel tea infuser.",
+    "Category": "Tea",
+    "Price": 10.50,
+    "Stock": 8,
+    "WeightKg": 0.1
+  }
+]

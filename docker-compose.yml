@@ -30,6 +30,7 @@ services:
       RESERVATION_SCAN_INTERVAL_SECONDS: ${RESERVATION_SCAN_INTERVAL_SECONDS:-15}
       Shipping__FlatRateUsd: ${Shipping__FlatRateUsd:-0.00}
       ERROR_LOG_RETENTION_DAYS: ${ERROR_LOG_RETENTION_DAYS:-30}
+      E2E_MODE: "false"
     depends_on:
       db:
         condition: service_healthy

@@ -14,6 +14,8 @@ RUN dotnet publish src/Store.Api/Store.Api.csproj --configuration Release --outp
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:8080
+ENV APP_UID=1654
 EXPOSE 8080
 COPY --from=api-build /app/publish .
+USER $APP_UID
 ENTRYPOINT ["dotnet", "Store.Api.dll"]

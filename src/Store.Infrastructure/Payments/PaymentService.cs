@@ -42,6 +42,12 @@ public sealed class PaymentService(
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
+        if (order.State == OrderState.Expired)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return Result(PaymentOutcome.Expired);
+        }
+
         if (order.State != OrderState.Reserved)
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -142,6 +148,12 @@ public sealed class PaymentService(
         {
             await transaction.CommitAsync(cancellationToken);
             return CaptureResult(order, PaymentResultStatus.Approved, PaymentOutcome.Approved);
+        }
+
+        if (order.State == OrderState.Expired)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return Result(PaymentOutcome.Expired);
         }
 
         if (order.State != OrderState.Reserved)

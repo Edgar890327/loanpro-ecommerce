@@ -5,6 +5,7 @@ using Serilog;
 using Store.Api;
 using Store.Api.Admin;
 using Store.Api.Auth;
+using Store.Api.E2e;
 using Store.Application;
 using Store.Infrastructure;
 using System.Text;
@@ -113,6 +114,11 @@ Store.Api.Payments.PaymentEndpoints.MapPaymentEndpoints(app);
 Store.Api.Admin.PaymentProviderEndpoints.MapPaymentProviderEndpoints(app);
 Store.Api.Admin.SettingsEndpoints.MapSettingsEndpoints(app);
 Store.Api.Shipping.ShippingEndpoints.MapShippingEndpoints(app);
+
+if (builder.Configuration.GetValue<bool>("E2E_MODE"))
+{
+    app.MapE2eEndpoints();
+}
 
 app.MapFallbackToFile("index.html");
 

@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using System.Security.Cryptography;
 
 namespace Store.IntegrationTests;
@@ -6,9 +8,14 @@ namespace Store.IntegrationTests;
 public sealed class TestApiFactory : WebApplicationFactory<Program>
 {
     private readonly Dictionary<string, string?> _originalEnvironment = new(StringComparer.Ordinal);
+    private readonly bool _e2eMode;
 
-    public TestApiFactory(PostgreSqlFixture fixture, int? reservationTtlSeconds = null)
+    public TestApiFactory(
+        PostgreSqlFixture fixture,
+        int? reservationTtlSeconds = null,
+        bool e2eMode = false)
     {
+        _e2eMode = e2eMode;
         AdminPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         SetEnvironment("ConnectionStrings__DefaultConnection", fixture.ConnectionString);
         SetEnvironment("ADMIN_PASSWORD", AdminPassword);
@@ -21,6 +28,15 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
     }
 
     public string AdminPassword { get; }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureAppConfiguration((_, configuration) =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["E2E_MODE"] = _e2eMode ? "true" : "false"
+            }));
+    }
 
     protected override void Dispose(bool disposing)
     {

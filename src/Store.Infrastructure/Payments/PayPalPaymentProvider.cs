@@ -14,6 +14,8 @@ public sealed class PayPalPaymentProvider(
     IMemoryCache cache) : IPaymentProvider
 {
     private static readonly SemaphoreSlim TokenLock = new(1, 1);
+    private static readonly string? ApiBaseUrlOverride =
+        Environment.GetEnvironmentVariable("PAYPAL_API_BASE_URL");
 
     public PaymentProviderDescriptor Descriptor { get; } = new(
         PayPalPaymentOptions.ProviderKey,
@@ -32,7 +34,7 @@ public sealed class PayPalPaymentProvider(
     {
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            $"{PayPalPaymentOptions.ApiBaseUrl(context.Configuration)}/v2/checkout/orders")
+            $"{ApiBaseUrl(context.Configuration)}/v2/checkout/orders")
         {
             Content = JsonContent.Create(new
             {
@@ -87,7 +89,7 @@ public sealed class PayPalPaymentProvider(
     {
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            $"{PayPalPaymentOptions.ApiBaseUrl(context.Configuration)}/v2/checkout/orders/{Uri.EscapeDataString(externalReference)}/capture")
+            $"{ApiBaseUrl(context.Configuration)}/v2/checkout/orders/{Uri.EscapeDataString(externalReference)}/capture")
         {
             Content = JsonContent.Create(new { })
         };
@@ -181,7 +183,7 @@ public sealed class PayPalPaymentProvider(
             var clientSecret = Required(configuration.Secrets, "clientSecret");
             using var request = new HttpRequestMessage(
                 HttpMethod.Post,
-                $"{PayPalPaymentOptions.ApiBaseUrl(configuration)}/v1/oauth2/token")
+                $"{ApiBaseUrl(configuration)}/v1/oauth2/token")
             {
                 Content = new StringContent("grant_type=client_credentials", Encoding.UTF8, "application/x-www-form-urlencoded")
             };
@@ -217,7 +219,7 @@ public sealed class PayPalPaymentProvider(
     {
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
-            $"{PayPalPaymentOptions.ApiBaseUrl(configuration)}/v2/checkout/orders/{Uri.EscapeDataString(externalReference)}");
+            $"{ApiBaseUrl(configuration)}/v2/checkout/orders/{Uri.EscapeDataString(externalReference)}");
         using var response = await SendAuthorizedAsync(request, configuration, cancellationToken);
         var payload = await ReadPayloadAsync(response, cancellationToken);
         if (!response.IsSuccessStatusCode)
@@ -383,10 +385,13 @@ public sealed class PayPalPaymentProvider(
     private static string Limit(string value, int maximum) =>
         value.Length <= maximum ? value : value[..maximum];
 
-    private static string TokenCacheKey(PaymentProviderConfiguration configuration)
+    private string ApiBaseUrl(PaymentProviderConfiguration configuration) =>
+        PayPalPaymentOptions.ApiBaseUrl(configuration, ApiBaseUrlOverride);
+
+    private string TokenCacheKey(PaymentProviderConfiguration configuration)
     {
         var clientId = configuration.PublicValues.GetValueOrDefault("clientId", string.Empty);
         return $"paypal-token-{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(
-            $"{PayPalPaymentOptions.ApiBaseUrl(configuration)}:{clientId}")))}";
+            $"{ApiBaseUrl(configuration)}:{clientId}")))}";
     }
 }

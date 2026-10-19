@@ -95,10 +95,105 @@ The PostgreSQL integration tests use Testcontainers and require a working Docker
 - Admin order history is available at `GET /api/admin/orders` with bounded paging and a projection containing status, provider key, timestamps, and totals without customer contact details. The admin error-log screen reuses `GET /api/admin/error-logs` for date, level, and correlation-ID filters, paging, and an expandable diagnostic detail view. Both screens require the administrator JWT; available stock is displayed separately from physical stock and flagged when it is five units or fewer.
 - Shared skeletons, a global render error boundary, and dismissible accessible notifications provide consistent loading, failure, and success feedback. The responsive shell supports keyboard navigation, a skip link, visible focus, semantic table and pagination landmarks, labeled controls, and reduced-motion preferences.
 - Each C# source file declares one top-level type and is named after that type. Keep React route screens and reusable UI components in their own files; colocate feature tests with the feature and keep shared models in feature-owned type folders.
-- Docker uses separate frontend build, .NET publish, and ASP.NET runtime stages. Compose exposes the app on port 8080 and gates startup on PostgreSQL health. An end-to-end Compose profile is left for milestone 9 rather than adding placeholder test services now.
+- Docker uses separate frontend build, .NET publish, and ASP.NET runtime stages. Compose exposes the app on port 8080 and gates startup on PostgreSQL health. The production runtime image runs as the non-root user with UID 1654.
 - The currency is fixed to USD. Adding a backend provider requires an `IPaymentProvider` implementation registered through DI; adding a storefront checkout requires a React component registered by provider key. Both implementations consume provider-neutral order and capture models.
 
+## End-to-end tests
+
+The Playwright suite contains 16 serial scenarios, each named with its catalog ID: E2E-01 admin login, E2E-02 product CRUD, E2E-03 catalog search/filter/shareable pagination, E2E-04 simulated purchase, E2E-05 declined payment, E2E-06 PayPal with stubs, E2E-07 active provider switching, E2E-08 shipping changes and frozen order totals, E2E-09 bilingual locale persistence, E2E-10 CSV golden import, E2E-11 duplicate SKU and confirmed reimport, E2E-12 stock limits, E2E-13 reservation expiry, E2E-14 last-unit concurrency, E2E-15 safe rendering of malicious-looking text, and E2E-16 admin order history.
+
+### Run the complete suite in Docker
+
+From the repository root:
+
+```sh
+npm --prefix e2e run docker:e2e
+```
+
+This builds and starts the E2E application, isolated PostgreSQL service, and local PayPal API stub, then runs Playwright in the matching browser image. The E2E overlay sets a 12-second reservation TTL and enables `POST /e2e/reset`; the endpoint is not mapped by the normal Compose configuration. Each test resets and reseeds the database, so do not point the E2E profile at data that must be kept. Playwright runs serially because tests share that database.
+
+To run only one scenario inside Docker after the first `docker:e2e` invocation has brought the stack up:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.e2e.yml --profile e2e run --rm e2e sh -c 'node wait-for-app.mjs && npm test -- --grep "E2E-06"'
+```
+
+To start the stack without running the suite, use `npm --prefix e2e run docker:up`. The Docker runner waits for `/health` before executing. Test results and the HTML report are mounted back to `e2e/test-results` and `e2e/playwright-report`; open the latter with `npm --prefix e2e run report`.
+
+For Playwright UI mode in Docker, start the E2E stack and expose the UI at <http://localhost:9323>:
+
+```sh
+npm --prefix e2e run docker:up
+npm --prefix e2e run docker:ui
+```
+
+### Run Playwright on the host
+
+The same E2E Docker profile provides the API, database, fixture reset endpoint, and PayPal stub. Start it first:
+
+```sh
+npm --prefix e2e run docker:up
+cd e2e
+npm ci
+npx playwright install chromium
+E2E_BASE_URL=http://127.0.0.1:8080 npm test
+```
+
+Run one scenario by ID, open Playwright UI mode, and view the generated report with:
+
+```sh
+npm run test:scenario -- "E2E-06"
+npm run ui -- --grep "E2E-06"
+npm run report
+```
+
+The tests intercept the PayPal JavaScript SDK in the browser and send backend Orders API calls to the local stub; no real PayPal account or sandbox credentials are needed. A manual real-sandbox test requires PayPal sandbox credentials entered through Admin → Settings, with the sandbox option enabled and the real PayPal API URL left configured.
+
+The Playwright config records traces, screenshots, and videos only for failed tests, and writes an HTML report. `CI=true` enables one retry and forbids focused tests. E2E-only environment variables are `E2E_MODE` (must be true to map the reset endpoint), `E2E_ADMIN_PASSWORD`, `E2E_JWT_SECRET`, `E2E_BASE_URL`, and `PAYPAL_API_BASE_URL` (the E2E overlay points it to the stub). The checked-in Compose defaults are local-only placeholders, not production credentials.
+
+## Test commands
+
+- Unit tests: `dotnet test tests/Store.UnitTests/Store.UnitTests.csproj`
+- PostgreSQL integration tests: `dotnet test tests/Store.IntegrationTests/Store.IntegrationTests.csproj` (requires Docker for Testcontainers)
+- Frontend checks: from `web/`, run `npm ci`, `npm run lint`, `npm run test:run`, and `npm run build`
+- End-to-end suite: `npm --prefix e2e run docker:e2e`, or use the host Playwright commands above
+
+## Architecture extensions
+
+To add a payment provider, implement the provider-neutral `IPaymentProvider` contract in Infrastructure, provide its descriptor and configuration schema, register it in dependency injection, and add one checkout component registered under the same provider key in the React checkout registry. Keep secrets in the provider's secret configuration fields so Settings encrypts them and public responses omit them.
+
+To add a shipping strategy, implement `IShippingStrategy`, describe its schema, register it in dependency injection, and persist selection/configuration through the existing Settings registry. The generic Settings UI renders the schema; order creation passes server-derived item weights, quantities, subtotal, and destination, then freezes the returned USD charge on the order.
+
+## Known limitations
+
+The application has no customer accounts/authentication, tax calculation, payment webhooks, multi-currency support, or refunds. PayPal E2E coverage uses deterministic local doubles rather than a live sandbox.
+
+## Sample CSV provenance
+
+The checked-in CSV fixture was derived from the challenge workbook provided with the project. The original download date was not recorded; the fixture was added to the repository on 2026-10-15. Its golden integration test verifies 95 data rows: 87 products created, 121,737 stock units applied, 6 warnings, 5 rejected rows, and 1 exact duplicate.
+
+## AI use
+
+AI assistance was used to implement and review portions of this challenge. The final code, tests, architecture choices, and documentation were reviewed and validated in the repository.
+
 ## Alternatives considered
+
+| Concern | Chosen approach | Alternative considered | Reason |
+|---|---|---|---|
+| Error persistence | Bounded `Channel<ErrorLog>` and batch worker with independent contexts | PostgreSQL Serilog sink or writing through the request `DbContext` | Keeps the required schema and request path independent of batch persistence failures and request transactions. |
+| Product concurrency | PostgreSQL `xmin` optimistic token | Application-managed integer version | PostgreSQL already changes `xmin` on updates, avoiding a second counter. |
+| Catalog search | Accent-normalized substring text with `pg_trgm` GIN index | Full-text search or unindexed `ILIKE` | Preserves substring matching across name/SKU/description while indexing typical searches. |
+| CSV parsing | CsvHelper with strict headers and explicit limits | Hand-written parser or rejecting the whole file | Handles quoting and multiline values correctly and reports invalid rows individually. |
+| Product imports | Atomic SQL stock increments, file hash, batch and movement audit | Read-modify-write or silent duplicate reimport | Prevents lost updates and makes repeat stock additions explicit and auditable. |
+| Admin authentication | Configured password exchanged for a short-lived JWT | HTTP Basic or persisted admin credentials | Avoids resending the long-lived password and avoids another credential store. |
+| Inventory reservation | Conditional updates in one transaction with `SKIP LOCKED` expiry worker | Read stock then write, or a single uncoordinated timer | Prevents overselling, partial reservations, and duplicate expiry processing across instances. |
+| Shipping | Database-backed `IShippingStrategy` registry and schema-driven Settings | Hard-coded flat rate or environment-only values | Allows runtime configuration and future weight/destination logic; the quote is frozen on each order. |
+| Payments | Provider-neutral Strategy contract, DI registry, and React component registry | Provider-specific branches in order endpoints or checkout pages | A provider can be added as one server class and one keyed UI component without changing order logic. |
+| Payment settings | Encrypted database settings and persisted Data Protection keys | Environment variables or ephemeral key ring | Enables provider switching at runtime and preserves decryption across restarts. |
+| PayPal | Browser SDK for approval and server-owned Orders API v2 calls | Direct card handling or hosted redirect | Limits payment-data exposure while retaining embedded approval. |
+| API errors and locale | Stable ProblemDetails codes translated by the client with `Intl` formatters | Server-localized prose and hard-coded formatting | Keeps the API language-neutral and formatting consistent across locales. |
+| E2E reset | Endpoint mapped only when `E2E_MODE=true`, backed by a fixture | General-purpose reset route or shared live sandbox | Isolates repeatable tests without exposing destructive reset behavior in normal execution. |
+| E2E PayPal | Browser SDK interception plus local backend HTTP stub | Live PayPal sandbox for automated runs | Makes CI deterministic and independent of external credentials and network state. |
 
 - **Composition root:** keeping API dependent only on Application would require an indirect or reflective registration mechanism for persistence and hosted workers. The API references Infrastructure only in its composition root to register adapters and apply migrations; route handlers consume Application ports, and Infrastructure still depends inward on Application and never on API.
 - **Frontend hosting:** a separate frontend container and reverse proxy would provide independent scaling, but serving the static Vite build from the API keeps this milestone to the requested `db` and `app` services.

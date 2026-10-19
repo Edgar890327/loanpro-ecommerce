@@ -1,0 +1,53 @@
+services:
+  app:
+    profiles:
+      - e2e
+    networks:
+      default:
+        aliases:
+          - store-api
+    environment:
+      E2E_MODE: "true"
+      RESERVATION_TTL_SECONDS: 12
+      RESERVATION_SCAN_INTERVAL_SECONDS: 1
+      ADMIN_PASSWORD: ${E2E_ADMIN_PASSWORD:-e2e-admin-only-local}
+      JWT_SECRET: ${E2E_JWT_SECRET:-e2e-jwt-secret-not-for-production-change-this}
+      PAYPAL_API_BASE_URL: http://paypal-stub:8081
+    depends_on:
+      db:
+        condition: service_healthy
+      paypal-stub:
+        condition: service_healthy
+
+  paypal-stub:
+    image: node:24-alpine
+    profiles:
+      - e2e
+    working_dir: /stub
+    command: ["node", "server.mjs"]
+    volumes:
+      - ./e2e/paypal-stub:/stub:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8081/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  e2e:
+    build:
+      context: .
+      dockerfile: e2e/Dockerfile
+    profiles:
+      - e2e
+    environment:
+      E2E_BASE_URL: http://store-api:8080
+      E2E_ADMIN_PASSWORD: ${E2E_ADMIN_PASSWORD:-e2e-admin-only-local}
+      CI: ${CI:-}
+    command: ["sh", "-c", "node wait-for-app.mjs && npm test"]
+    ports:
+      - "9323:9323"
+    volumes:
+      - ./e2e/playwright-report:/workspace/e2e/playwright-report
+      - ./e2e/test-results:/workspace/e2e/test-results
+    depends_on:
+      - app

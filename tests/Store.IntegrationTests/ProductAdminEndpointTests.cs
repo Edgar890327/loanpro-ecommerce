@@ -195,6 +195,36 @@ public sealed class ProductAdminEndpointTests(PostgreSqlFixture fixture) : IClas
     }
 
     [Fact]
+    public async Task E2eResetEndpoint_IsOnlyMappedWhenE2eModeIsEnabled()
+    {
+        using (var normalFactory = new TestApiFactory(fixture))
+        using (var normalClient = normalFactory.CreateClient())
+        using (var unavailable = await normalClient.PostAsync("/e2e/reset", null))
+        {
+            Assert.Contains(
+                unavailable.StatusCode,
+                new[] { HttpStatusCode.NotFound, HttpStatusCode.MethodNotAllowed });
+        }
+
+        using var e2eFactory = new TestApiFactory(fixture, e2eMode: true);
+        using var e2eClient = e2eFactory.CreateClient();
+        using var resetResponse = await e2eClient.PostAsync("/e2e/reset", null);
+        Assert.Equal(HttpStatusCode.NoContent, resetResponse.StatusCode);
+
+        using var loginResponse = await e2eClient.PostAsJsonAsync(
+            "/auth/login",
+            new { password = e2eFactory.AdminPassword });
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+        using var catalogResponse = await e2eClient.GetAsync("/api/catalog?q=E2E-ESPRESSO");
+        Assert.Equal(HttpStatusCode.OK, catalogResponse.StatusCode);
+        using var catalog = await JsonDocument.ParseAsync(
+            await catalogResponse.Content.ReadAsStreamAsync());
+        Assert.Contains(
+            catalog.RootElement.GetProperty("items").EnumerateArray(),
+            product => product.GetProperty("sku").GetString() == "E2E-ESPRESSO");
+    }
+
+    [Fact]
     public async Task Login_RejectsAnIncorrectAdminPassword()
     {
         using var factory = new TestApiFactory(fixture);
