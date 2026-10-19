@@ -244,7 +244,12 @@ namespace Store.Infrastructure.Migrations
                     b.HasIndex("CustomerId", "CreatedAtUtc", "Id")
                         .IsDescending(false, true, true);
 
-                    b.ToTable("Orders", (string)null);
+                    b.ToTable("Orders", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Orders_Amounts", "\"Subtotal\" >= 0 AND \"Shipping\" >= 0 AND \"Total\" = \"Subtotal\" + \"Shipping\"");
+
+                            t.HasCheckConstraint("CK_Orders_State", "\"State\" IN ('Reserved', 'Paid', 'Failed', 'Expired', 'Cancelled')");
+                        });
                 });
 
             modelBuilder.Entity("Store.Domain.OrderItem", b =>
@@ -282,7 +287,12 @@ namespace Store.Infrastructure.Migrations
 
                     b.HasIndex("ProductId");
 
-                    b.ToTable("OrderItems", (string)null);
+                    b.ToTable("OrderItems", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrderItems_Quantity_Positive", "\"Quantity\" > 0");
+
+                            t.HasCheckConstraint("CK_OrderItems_UnitPrice_NonNegative", "\"UnitPrice\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Store.Domain.Payment", b =>
@@ -331,7 +341,10 @@ namespace Store.Infrastructure.Migrations
                     b.HasIndex("OrderId")
                         .IsUnique();
 
-                    b.ToTable("Payments", (string)null);
+                    b.ToTable("Payments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Payments_Amount_Positive", "\"Amount\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("Store.Domain.PaymentProviderSetting", b =>
@@ -452,7 +465,11 @@ namespace Store.Infrastructure.Migrations
 
                     b.ToTable("Products", null, t =>
                         {
+                            t.HasCheckConstraint("CK_Products_Price_Positive", "\"Price\" > 0");
+
                             t.HasCheckConstraint("CK_Products_Stock_Reserved", "\"Stock\" >= \"Reserved\" AND \"Reserved\" >= 0");
+
+                            t.HasCheckConstraint("CK_Products_Weight_NonNegative", "\"WeightKg\" IS NULL OR \"WeightKg\" >= 0");
                         });
                 });
 

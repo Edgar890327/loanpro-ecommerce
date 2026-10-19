@@ -61,9 +61,16 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
 
         modelBuilder.Entity<Product>(entity =>
         {
-            entity.ToTable("Products", table => table.HasCheckConstraint(
-                "CK_Products_Stock_Reserved",
-                "\"Stock\" >= \"Reserved\" AND \"Reserved\" >= 0"));
+            entity.ToTable("Products", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_Products_Stock_Reserved",
+                    "\"Stock\" >= \"Reserved\" AND \"Reserved\" >= 0");
+                table.HasCheckConstraint("CK_Products_Price_Positive", "\"Price\" > 0");
+                table.HasCheckConstraint(
+                    "CK_Products_Weight_NonNegative",
+                    "\"WeightKg\" IS NULL OR \"WeightKg\" >= 0");
+            });
             entity.HasKey(product => product.Id);
             entity.Property(product => product.Name).HasMaxLength(200).IsRequired();
             entity.Property(product => product.Sku).HasMaxLength(64).IsRequired();
@@ -140,7 +147,15 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
 
         modelBuilder.Entity<Order>(entity =>
         {
-            entity.ToTable("Orders");
+            entity.ToTable("Orders", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_Orders_Amounts",
+                    "\"Subtotal\" >= 0 AND \"Shipping\" >= 0 AND \"Total\" = \"Subtotal\" + \"Shipping\"");
+                table.HasCheckConstraint(
+                    "CK_Orders_State",
+                    "\"State\" IN ('Reserved', 'Paid', 'Failed', 'Expired', 'Cancelled')");
+            });
             entity.HasKey(order => order.Id);
             entity.Property(order => order.IdempotencyKeyHash).HasMaxLength(64).IsRequired();
             entity.Property(order => order.RequestHash).HasMaxLength(64).IsRequired();
@@ -178,7 +193,11 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
 
         modelBuilder.Entity<OrderItem>(entity =>
         {
-            entity.ToTable("OrderItems");
+            entity.ToTable("OrderItems", table =>
+            {
+                table.HasCheckConstraint("CK_OrderItems_Quantity_Positive", "\"Quantity\" > 0");
+                table.HasCheckConstraint("CK_OrderItems_UnitPrice_NonNegative", "\"UnitPrice\" >= 0");
+            });
             entity.HasKey(item => item.Id);
             entity.Property(item => item.ProductName).HasMaxLength(200).IsRequired();
             entity.Property(item => item.ProductSku).HasMaxLength(64).IsRequired();
@@ -198,7 +217,8 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
 
         modelBuilder.Entity<Payment>(entity =>
         {
-            entity.ToTable("Payments");
+            entity.ToTable("Payments", table =>
+                table.HasCheckConstraint("CK_Payments_Amount_Positive", "\"Amount\" > 0"));
             entity.HasKey(payment => payment.Id);
             entity.Property(payment => payment.ProviderKey).HasMaxLength(64).IsRequired();
             entity.Property(payment => payment.ExternalReference).HasMaxLength(128).IsRequired();
