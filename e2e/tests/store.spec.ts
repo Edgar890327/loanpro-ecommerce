@@ -216,9 +216,10 @@ test('E2E-11 duplicate SKU aggregation and confirmed reimport', async ({ loginAs
   await page.getByRole('button', { name: 'Preview import' }).click()
   await expect(page.getByText(/previously imported/)).toBeVisible()
   await page.getByLabel('I understand this reimport will add stock again.').check()
+  await expect(page.getByRole('heading', { name: 'Import preview' })).toBeVisible()
   await page.getByRole('button', { name: 'Apply import' }).click()
-  const product = await findProduct(request, 'E2E-DUP-01')
-  expect(product.stock).toBe(16)
+  await expect(page.getByRole('heading', { name: 'Import result' })).toBeVisible()
+  await expect.poll(async () => (await findProduct(request, 'E2E-DUP-01')).stock).toBe(16)
 })
 
 test('E2E-12 cart quantity limits and server inventory validation', async ({ loginAs }) => {

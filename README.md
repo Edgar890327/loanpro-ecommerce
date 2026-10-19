@@ -203,7 +203,7 @@ The Playwright suite contains 23 serial scenarios, each named with its catalog I
 
 ### Run the complete suite in Docker
 
-The e2e profile shares the database volume with the normal stack, and the admin is only seeded when absent. If the stack was started before with a different `ADMIN_PASSWORD`, run `docker compose -f docker-compose.yml -f docker-compose.e2e.yml --profile e2e down -v` first.
+The e2e profile shares the database volume with the normal stack, and the admin is only seeded when absent. `npm --prefix e2e run docker:up` (and therefore `docker:e2e`) first runs `down -v`, so the e2e run always starts from an empty database and the local development data is discarded.
 
 From the repository root:
 
