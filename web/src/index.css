@@ -887,12 +887,6 @@ th {
   list-style: none;
 }
 
-.admin-nav {
-  gap: 0.5rem 1.25rem;
-  padding-left: 2.5rem;
-  border-left: 1px solid #d5dbe7;
-}
-
 .site-header nav a {
   display: inline-flex;
   align-items: center;
@@ -1108,8 +1102,4 @@ th {
 }
 
 @media (max-width: 800px) {
-  .admin-nav {
-    padding-left: 0;
-    border-left: 0;
   }
-}

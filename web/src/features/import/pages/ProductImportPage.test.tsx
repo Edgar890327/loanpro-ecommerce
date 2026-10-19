@@ -56,6 +56,29 @@ describe('product CSV import page', () => {
     void i18n.changeLanguage('en-US')
   })
 
+  it('paginates the row report ten rows at a time', async () => {
+    const rows = Array.from({ length: 25 }, (_, index) => ({
+      rowNumber: index + 2,
+      status: 'rejected',
+      messages: ['Name is required.'],
+    }))
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ ...previewReport, reimportDetected: false, rows })))
+    const { container } = renderImportPage()
+
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['a'], 'p.csv', { type: 'text/csv' })] },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Preview import' }))
+
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(11))
+    expect(screen.getByText('Page 1 of 3')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByText('Page 2 of 3')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getAllByRole('row')).toHaveLength(6)
+    expect(screen.getByRole('button', { name: 'Next' }).hasAttribute('disabled')).toBe(true)
+  })
+
   it('previews, requires explicit reimport confirmation, applies and downloads the report', async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const form = init?.body as FormData

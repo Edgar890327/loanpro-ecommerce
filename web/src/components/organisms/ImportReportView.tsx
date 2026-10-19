@@ -1,9 +1,16 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ImportReport } from '../../features/import/types/ImportReport'
+
+const pageSize = 10
 
 export function ImportReportView({ report }: { report: ImportReport }) {
   const { t } = useTranslation()
   const { summary } = report
+  const [page, setPage] = useState(1)
+  const pages = Math.max(1, Math.ceil(report.rows.length / pageSize))
+  const current = Math.min(page, pages)
+  const visibleRows = report.rows.slice((current - 1) * pageSize, current * pageSize)
   return (
     <div className="import-report">
       <h2>{report.dryRun ? t('importPreviewTitle') : t('importResultTitle')}</h2>
@@ -26,7 +33,7 @@ export function ImportReportView({ report }: { report: ImportReport }) {
             </tr>
           </thead>
           <tbody>
-            {report.rows.map((row) => (
+            {visibleRows.map((row) => (
               <tr key={row.rowNumber}>
                 <td>{row.rowNumber}</td>
                 <td>{t(importStatusKey(row.status))}</td>
@@ -36,6 +43,17 @@ export function ImportReportView({ report }: { report: ImportReport }) {
           </tbody>
         </table>
       </div>
+      {pages > 1 && (
+        <nav className="pagination" aria-label={t('pagination')}>
+          <button type="button" disabled={current <= 1} onClick={() => setPage(current - 1)}>
+            {t('previous')}
+          </button>
+          <span aria-current="page">{t('page', { page: current, pages })}</span>
+          <button type="button" disabled={current >= pages} onClick={() => setPage(current + 1)}>
+            {t('next')}
+          </button>
+        </nav>
+      )}
     </div>
   )
 }

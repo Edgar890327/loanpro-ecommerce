@@ -29,15 +29,15 @@ export function Layout() {
                 {cartCount > 0 && <span className="cart-count" aria-hidden="true">{cartCount}</span>}
               </NavLink>
             </li>
+            {isAdmin && (
+              <>
+                <li><NavLink to="/admin/products">{t('products')}</NavLink></li>
+                <li><NavLink to="/admin/settings">{t('settingsTitle')}</NavLink></li>
+                <li><NavLink to="/admin/orders">{t('orderHistory')}</NavLink></li>
+                <li><NavLink to="/admin/error-logs">{t('errorLogs')}</NavLink></li>
+              </>
+            )}
           </ul>
-          {isAdmin && (
-            <ul className="nav-list admin-nav" aria-label={t('adminNavigation')}>
-              <li><NavLink to="/admin/products">{t('products')}</NavLink></li>
-              <li><NavLink to="/admin/settings">{t('settingsTitle')}</NavLink></li>
-              <li><NavLink to="/admin/orders">{t('orderHistory')}</NavLink></li>
-              <li><NavLink to="/admin/error-logs">{t('errorLogs')}</NavLink></li>
-            </ul>
-          )}
         </nav>
         <div className="account-menu" role="group" aria-label={t('accountMenu')}>
           {user
