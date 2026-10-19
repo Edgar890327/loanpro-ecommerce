@@ -14,7 +14,9 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore Store.slnx
       - run: dotnet build Store.slnx --configuration Release --no-restore
-      - run: dotnet test tests/Store.UnitTests/Store.UnitTests.csproj --configuration Release --no-build -p:CollectCoverage=true -p:Threshold=80 -p:ThresholdType=line -p:ThresholdStat=total -p:ExcludeByFile="**/Program.cs%2c**/StoreDbContextFactory.cs%2c**/Migrations/*.cs%2c**/EfCoreErrorLogBatchStore.cs%2c**/Endpoints/**/*.cs%2c**/ProductImportService.cs%2c**/ProductCatalogReader.cs%2c**/ProductAdministration.cs%2c**/ErrorLogReader.cs%2c**/DatabaseHealthReader.cs%2c**/Entities/ImportBatch.cs%2c**/Entities/StockMovement.cs%2c**/Products/Administration/*.cs%2c**/Catalog/CatalogCategoryResponse.cs%2c**/Catalog/CatalogPage.cs%2c**/Catalog/CatalogProductResponse.cs%2c**/ErrorLogging/ErrorLogPage.cs%2c**/ErrorLogging/ErrorLogQuery.cs%2c**/Products/Importing/ProductImportReport.cs%2c**/Products/Importing/ProductImportResult.cs%2c**/Products/Importing/ProductImportSummary.cs%2c**/Products/Importing/ProductImportRowReport.cs"
+      - run: |
+          EX=$(grep -o 'ExcludeByFile="[^"]*"' README.md | head -1)
+          dotnet test tests/Store.UnitTests/Store.UnitTests.csproj --configuration Release --no-build -p:CollectCoverage=true -p:Threshold=80 -p:ThresholdType=line -p:ThresholdStat=total "-p:${EX}"
       - run: dotnet test tests/Store.IntegrationTests/Store.IntegrationTests.csproj --configuration Release --no-build
 
   frontend:
@@ -33,3 +35,10 @@ jobs:
       - run: npm run lint
       - run: npm run test:run
       - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm --prefix e2e run docker:e2e

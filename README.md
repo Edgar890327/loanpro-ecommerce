@@ -1,6 +1,6 @@
 # LoanPro E-Commerce
 
-An enterprise e-commerce application built with .NET 10, PostgreSQL, and React. The application provides a public product catalog with searchable filters and product details, role-based accounts (Customer and Admin) with cookie sessions, product administration, asynchronous persistent error logging, auditable CSV product imports, guest checkout with expiring inventory reservations, and extensible simulated/PayPal payment capture.
+An enterprise e-commerce application built with .NET 10, PostgreSQL, and React. The application provides a public product catalog with searchable filters and product details, role-based accounts (Customer and Admin) with cookie sessions, product administration, asynchronous persistent error logging, auditable CSV product imports, customer-only checkout with expiring inventory reservations, and extensible simulated/PayPal payment capture.
 
 ## Requirements
 
@@ -69,7 +69,7 @@ The PostgreSQL integration tests use Testcontainers and require a working Docker
 - The solution contains `Store.Domain`, `Store.Application`, `Store.Infrastructure`, and `Store.Api`, plus unit and integration test projects. Backend files are grouped by layer, feature, and responsibility: entities and text helpers in Domain, catalog/error-log/health/product use-case contracts and validation in Application, persistence and feature adapters in Infrastructure, and endpoint/auth/middleware adapters in Api. `Application` depends on `Domain`; `Infrastructure` depends inward on `Application`; API handlers depend on Application contracts and do not access `StoreDbContext`. The API references Infrastructure only for composition-root registration and startup migrations.
 - Nullable reference types are enabled and compiler warnings are treated as errors repository-wide.
 - EF Core and Npgsql are wired through `StoreDbContext`. Migrations are applied automatically at API startup. The catalog migration adds categories and products with decimal precision, a normalized unique SKU index, soft-delete filtering, and PostgreSQL `xmin` optimistic concurrency. The `CustomerOrders` migration cannot attach legacy guest orders to a customer, so it deletes existing orders, order items, payments, and order-linked stock movements and resets `Reserved` to zero before making `customer_id` mandatory.
-- Identity uses a single `users` table with a `Customer` or `Admin` role. The administrator is seeded idempotently from `ADMIN_EMAIL` and `ADMIN_PASSWORD`; passwords are hashed with the ASP.NET Core `PasswordHasher`. `POST /auth/register` creates a customer and signs in, `POST /auth/login` is shared by both roles, `POST /auth/logout` clears the session, and `GET /me` returns id, name, role, and preferred locale. A duplicate email is detected through the unique index on the normalized email and returns 409. Login answers identically for an unknown email and a wrong password and verifies a dummy hash to equalize timing.
+- Identity uses a single `Users` table with a `Customer` or `Admin` role. The administrator is seeded idempotently from `ADMIN_EMAIL` and `ADMIN_PASSWORD`; passwords are hashed with the ASP.NET Core `PasswordHasher`. `POST /auth/register` creates a customer and signs in, `POST /auth/login` is shared by both roles, `POST /auth/logout` clears the session, and `GET /me` returns id, name, role, and preferred locale. A duplicate email is detected through the unique index on the normalized email and returns 409. Login answers identically for an unknown email and a wrong password and verifies a dummy hash to equalize timing.
 - The session is a short-lived JWT in an `HttpOnly`, `SameSite=Lax` cookie (`Secure` whenever the request is HTTPS; behind a TLS-terminating proxy, enable forwarded headers). Because the cookie is sent automatically, every `POST`, `PUT`, `PATCH`, and `DELETE` must carry `X-Requested-With: store`; otherwise the API answers 403 with a ProblemDetails body. The React HTTP client adds the header and the session context is built from `GET /me`.
 - Policies: `AdminOnly` covers product CRUD, import, Settings, and the error log; `CustomerOnly` covers purchases. Catalog, search, and shipping quotes are public. `/auth` is rate limited per IP and per email (429 `RATE_LIMITED`). Emails, passwords, tokens, and addresses are never written to logs or to the error log. Auth error codes (`INVALID_CREDENTIALS`, `EMAIL_TAKEN`, `RATE_LIMITED`, `FORBIDDEN`, `SESSION_EXPIRED`) are stable and translated in the client.
 - Product CRUD and the read-only `GET /api/admin/error-logs` endpoint require the `AdminOnly` authorization policy. Product writes validate names, SKU, category, price, stock, weight, and maximum field lengths in the Application layer.
@@ -102,6 +102,60 @@ The PostgreSQL integration tests use Testcontainers and require a working Docker
 - Each C# source file declares one top-level type and is named after that type. Keep React route screens and reusable UI components in their own files; colocate feature tests with the feature and keep shared models in feature-owned type folders.
 - Docker uses separate frontend build, .NET publish, and ASP.NET runtime stages. Compose exposes the app on port 8080 and gates startup on PostgreSQL health. The production runtime image runs as the non-root user with UID 1654.
 - The currency is fixed to USD. Adding a backend provider requires an `IPaymentProvider` implementation registered through DI; adding a storefront checkout requires a React component registered by provider key. Both implementations consume provider-neutral order and capture models.
+
+## Database design
+
+PostgreSQL was chosen because the purchase flow needs transactional, row-level atomic stock updates (`UPDATE ... WHERE stock - reserved >= @q`), declarative integrity (CHECK, FK, unique indexes), sequences for order numbers, `pg_trgm` for fast substring search and `LATERAL` joins for purchase history. A document store would push those guarantees into application code.
+
+```mermaid
+erDiagram
+    Users ||--o{ Orders : places
+    Users ||--o{ ImportBatches : runs
+    Categories ||--o{ Products : groups
+    Products ||--o{ OrderItems : "frozen into"
+    Orders ||--|{ OrderItems : contains
+    Orders ||--o{ Payments : "paid by"
+    Products ||--o{ StockMovements : audits
+```
+
+| Table | Purpose | Key constraints and indexes |
+|---|---|---|
+| `users` | Customers and the seeded admin | unique `EmailNormalized`, role |
+| `Categories`, `Products` | Catalog with soft delete | unique SKU, `CK_Products_Price_Positive`, `CK_Products_Weight_NonNegative`, `CK_Products_Stock_Reserved` (`0 <= reserved <= stock`), trigram GIN index on the normalized search text |
+| `Orders`, `OrderItems` | Frozen purchase snapshot (price, name, SKU, shipping, address) | unique `order_number` (sequence, `ORD-YYYY-000123`), unique `(customer_id, idempotency_key)`, `(customer_id, created_at DESC, id DESC)`, `CK_Orders_Amounts` (`total = subtotal + shipping`), `CK_Orders_State`, positive quantity |
+| `Payments` | Provider attempts and external references | positive amount, FK to order |
+| `StockMovements`, `ImportBatches` | Inventory audit and CSV import audit | FK to products and the importing admin |
+| `ErrorLog` | Persistent error log | indexes on timestamp and correlation id |
+| `PaymentProviderSettings`, `ShippingStrategySettings`, `DataProtectionKeys` | Encrypted provider configuration and keys | one active provider |
+
+Integrity is enforced by the database itself, not only by validators; `DatabaseConstraintTests` proves invalid rows are rejected. Migrations live in `Store.Infrastructure/Migrations`.
+
+## Search design
+
+Catalog search normalizes the query (case and accents), splits it into terms, and requires every term to match the product name, SKU, description or category (AND, any order). LIKE wildcards are escaped and all values are parameterized. Relevance ordering ranks exact name or SKU matches first, then prefixes, then name or SKU containing the text, then everything else, with stable tie-breakers so pagination never duplicates rows. Filters (category, price range, in stock) and sorting combine with the query.
+
+## Purchase flow
+
+1. The cart lives in the browser (local storage) and is validated against stock without reserving anything.
+2. Checkout requires a Customer session. Creating the order runs one transaction: every item is reserved with a guarded `UPDATE`; if any item is short, nothing is reserved and the response lists the available quantity per item.
+3. The order stores `reserved_until` (TTL from configuration, 15 minutes by default) and is idempotent per customer and key.
+4. Creating a payment and capturing it verify the order belongs to the token's customer (404 otherwise). Capture rejects expired reservations and, in one transaction, converts reserved stock into sold stock and marks the order Paid.
+5. Failing or cancelling releases the reservation; a background service expires overdue reservations, releases stock and records a `StockMovement`.
+
+States: `Reserved -> Paid | Failed | Expired | Cancelled`.
+
+## Testing strategy
+
+| Level | Tooling | What it covers |
+|---|---|---|
+| Unit | xUnit, coverage gate of 80% lines | validators, reservation and expiry rules, CSV parsing, search ranking, auth, hashing, shipping, payment contracts |
+| Integration | xUnit + Testcontainers (real PostgreSQL) | endpoints, constraints, concurrency for the last unit, idempotency, expiry, import, search, role isolation |
+| Frontend | Vitest + Testing Library | cart, checkout guard, forms, i18n key parity, Settings schema rendering, order history |
+| End to end | Playwright in Docker | 23 scenarios (`E2E-01`..`E2E-23`) |
+
+## Development process
+
+Work was delivered in milestones, each ending with green tests, README updates and one Conventional Commit: error log persistence, admin and catalog, CSV import, clean architecture refactor, reservations, payment providers, shipping settings, bilingual accessible UI, end-to-end suite, then the identity redesign (roles, customer-only orders, payments and purchase history). CI (`.github/workflows/ci.yml`) runs backend unit tests with the coverage gate, integration tests, frontend lint, tests and build, and the Docker end-to-end suite.
 
 ## End-to-end tests
 
@@ -136,6 +190,8 @@ The Playwright suite contains 23 serial scenarios, each named with its catalog I
 `POST /e2e/reset` (mapped only when `E2E_MODE=true`) truncates data, reloads the base product fixture, and keeps only the seeded admin; it creates no customers. Playwright fixtures in `e2e/support/fixtures.ts` provide `registerCustomer` (through the API) and `loginAs(role)`, which saves a per-role `storageState` in `e2e/.auth/` (git-ignored) so every scenario starts from a clean session. API requests made with Playwright's `request` send the `X-Requested-With: store` header.
 
 ### Run the complete suite in Docker
+
+The e2e profile shares the database volume with the normal stack, and the admin is only seeded when absent. If the stack was started before with a different `ADMIN_PASSWORD`, run `docker compose -f docker-compose.yml -f docker-compose.e2e.yml --profile e2e down -v` first.
 
 From the repository root:
 
@@ -213,6 +269,8 @@ AI assistance was used to implement and review portions of this challenge. The f
 
 | Concern | Chosen approach | Alternative considered | Reason |
 |---|---|---|---|
+| Search | `pg_trgm` GIN index over normalized text, multi-term AND | PostgreSQL full-text search, Elasticsearch | Substring and partial-word matching with no extra service |
+| Integrity | CHECK constraints plus FKs in the database | Validation only in code | Invalid data cannot enter through any path |
 | Identity | Single `users` table, HttpOnly SameSite=Lax cookie JWT, custom-header CSRF defense | Separate admin/customer stores, tokens in `localStorage`, or CSRF tokens | One login path for both roles, tokens unreachable from scripts, and a stateless CSRF check that needs no server-side token store. |
 | Error persistence | Bounded `Channel<ErrorLog>` and batch worker with independent contexts | PostgreSQL Serilog sink or writing through the request `DbContext` | Keeps the required schema and request path independent of batch persistence failures and request transactions. |
 | Product concurrency | PostgreSQL `xmin` optimistic token | Application-managed integer version | PostgreSQL already changes `xmin` on updates, avoiding a second counter. |
