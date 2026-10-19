@@ -6,6 +6,8 @@ import { StockBadge } from '../../../components/atoms/StockBadge'
 import type { CatalogProduct } from '../types/CatalogProduct'
 import { useCart } from '../../cart/state/useCart'
 import { formatCurrency, formatNumber } from '../../../shared/i18n/format'
+import { CartIcon } from '../../../components/atoms/CartIcon'
+import { useNotifications } from '../../../shared/notifications/useNotifications'
 import { LoadingSkeleton } from '../../../components/atoms/LoadingSkeleton'
 
 export function PublicProductDetailPage() {
@@ -13,6 +15,7 @@ export function PublicProductDetailPage() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const { addProduct } = useCart()
+  const { notify } = useNotifications()
   const product = useQuery({
     queryKey: ['public-product', id],
     queryFn: () => apiRequest<CatalogProduct>(`/api/catalog/${id}`),
@@ -38,7 +41,16 @@ export function PublicProductDetailPage() {
         <div><dt>{t('weight')}</dt><dd>{product.data.weightKg === null ? t('notSpecified') : formatNumber(product.data.weightKg, i18n.language)}</dd></div>
         <div><dt>{t('availability')}</dt><dd><StockBadge stock={product.data.stock} /></dd></div>
       </dl>
-      <button type="button" disabled={product.data.stock <= 0} onClick={() => addProduct(product.data!)}>
+      <button
+        type="button"
+        className="primary-button add-to-cart-button"
+        disabled={product.data.stock <= 0}
+        onClick={() => {
+          addProduct(product.data!)
+          notify(t('addedToCart', { name: product.data!.name }))
+        }}
+      >
+        <CartIcon />
         {product.data.stock > 0 ? t('addToCart') : t('outOfStock')}
       </button>
     </article>

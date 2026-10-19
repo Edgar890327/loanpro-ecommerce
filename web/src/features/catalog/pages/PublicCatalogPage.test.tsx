@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PublicCatalogPage } from './PublicCatalogPage'
 import { PublicProductDetailPage } from './PublicProductDetailPage'
 import i18n from '../../../shared/i18n/i18n'
 import { CartProvider } from '../../cart/state/CartProvider'
+import { NotificationProvider } from '../../../shared/notifications/NotificationProvider'
 
 function LocationProbe() {
   const location = useLocation()
@@ -19,13 +20,15 @@ function renderCatalog(initialEntry: string) {
   return render(
     <QueryClientProvider client={queryClient}>
       <CartProvider>
-        <MemoryRouter initialEntries={[initialEntry]}>
-          <LocationProbe />
-          <Routes>
-            <Route path="/" element={<PublicCatalogPage />} />
-            <Route path="/products/:id" element={<PublicProductDetailPage />} />
-          </Routes>
-        </MemoryRouter>
+        <NotificationProvider>
+          <MemoryRouter initialEntries={[initialEntry]}>
+            <LocationProbe />
+            <Routes>
+              <Route path="/" element={<PublicCatalogPage />} />
+              <Route path="/products/:id" element={<PublicProductDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </NotificationProvider>
       </CartProvider>
     </QueryClientProvider>,
   )
@@ -40,6 +43,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 describe('public catalog pages', () => {
   afterEach(() => {
+    cleanup()
     vi.unstubAllGlobals()
     void i18n.changeLanguage('en-US')
   })
@@ -138,5 +142,25 @@ describe('public catalog pages', () => {
       'href',
       '/?q=cafe&category=Drinks&page=2',
     )
+  })
+
+  it('announces a green notification when a product is added to the cart', async () => {
+    const product = {
+      id: '0d3b6c5e-2f1a-4c58-9a5e-6f1a5f0e8c11',
+      name: 'Tea',
+      sku: 'TEA-1',
+      description: 'Green tea',
+      category: 'Drinks',
+      price: 4,
+      stock: 3,
+      weightKg: null,
+    }
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(product)))
+    renderCatalog(`/products/${product.id}`)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to cart' }))
+
+    const toast = (await screen.findByText('Tea was added to your cart.')).closest('.notification')
+    expect(toast).toHaveClass('notification-success')
   })
 })

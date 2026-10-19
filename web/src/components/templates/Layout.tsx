@@ -1,6 +1,7 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../shared/auth/auth-context'
+import { CartIcon } from '../atoms/CartIcon'
 import { useCart } from '../../features/cart/state/useCart'
 
 export function Layout() {
@@ -9,6 +10,7 @@ export function Layout() {
   const navigate = useNavigate()
   const isAdmin = user?.role === 'Admin'
   const { items } = useCart()
+  const cartCount = items.reduce((count, item) => count + item.quantity, 0)
 
   return (
     <div className="app-shell">
@@ -18,12 +20,24 @@ export function Layout() {
           Store
         </Link>
         <nav aria-label={t('mainNavigation')}>
-          <Link to="/">{t('home')}</Link>
-          <Link to="/cart">{t('cart')} ({items.reduce((count, item) => count + item.quantity, 0)})</Link>
-          {isAdmin && <Link to="/admin/products">{t('products')}</Link>}
-          {isAdmin && <Link to="/admin/settings">{t('settingsTitle')}</Link>}
-          {isAdmin && <Link to="/admin/orders">{t('orderHistory')}</Link>}
-          {isAdmin && <Link to="/admin/error-logs">{t('errorLogs')}</Link>}
+          <ul className="nav-list">
+            <li><NavLink to="/" end>{t('home')}</NavLink></li>
+            <li>
+              <NavLink className="cart-link" to="/cart" aria-label={t('cartWithCount', { count: cartCount })}>
+                <CartIcon />
+                <span>{t('cart')}</span>
+                {cartCount > 0 && <span className="cart-count" aria-hidden="true">{cartCount}</span>}
+              </NavLink>
+            </li>
+          </ul>
+          {isAdmin && (
+            <ul className="nav-list admin-nav" aria-label={t('adminNavigation')}>
+              <li><NavLink to="/admin/products">{t('products')}</NavLink></li>
+              <li><NavLink to="/admin/settings">{t('settingsTitle')}</NavLink></li>
+              <li><NavLink to="/admin/orders">{t('orderHistory')}</NavLink></li>
+              <li><NavLink to="/admin/error-logs">{t('errorLogs')}</NavLink></li>
+            </ul>
+          )}
         </nav>
         <div className="account-menu" role="group" aria-label={t('accountMenu')}>
           {user

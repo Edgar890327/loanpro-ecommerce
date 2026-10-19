@@ -26,7 +26,7 @@ export function SettingsPage() {
   return (
     <div className="settings-page">
       <h1>{t('settingsTitle')}</h1>
-      <section className="panel">
+      <section className="panel settings-section">
         <h2>{t('paymentSettingsTitle')}</h2>
         {settings.data.paymentProviders.map((setting) => (
           <SettingsEditor
@@ -37,7 +37,7 @@ export function SettingsPage() {
           />
         ))}
       </section>
-      <section className="panel">
+      <section className="panel settings-section">
         <h2>{t('shippingSettingsTitle')}</h2>
         {settings.data.shippingStrategies.map((setting) => (
           <SettingsEditor
@@ -94,7 +94,11 @@ function SettingsEditor({
       event.preventDefault()
       if (window.confirm(t('confirmSaveSettings'))) save.mutate(false)
     }}>
-      <h3>{t(`settingName_${setting.key}`, { defaultValue: setting.name })}{setting.isActive ? ` — ${t('active')}` : ''}</h3>
+      <div className="settings-editor-header">
+        <h3>{t(`settingName_${setting.key}`, { defaultValue: setting.name })}</h3>
+        {setting.isActive && <span className="status-pill">{t('active')}</span>}
+      </div>
+      <div className="settings-fields">
       {setting.configurationFields.map((field) => (
         <SettingField
           key={field.key}
@@ -106,7 +110,8 @@ function SettingsEditor({
           onChange={(value) => updateField(field.key, value, field.secret)}
         />
       ))}
-      <label>
+      </div>
+      <label className="checkbox-field">
         <input
           type="checkbox"
           checked={enabled}
@@ -118,10 +123,11 @@ function SettingsEditor({
       {save.isError && <p role="alert">{translateApiError(save.error, t, 'settingsSaveFailed')}</p>}
       {save.isSuccess && <p role="status">{t('settingsSaved')}</p>}
       <div className="form-actions">
-        <button type="submit" disabled={save.isPending}>{t('savePaymentSettings')}</button>
+        <button type="submit" className="primary-button" disabled={save.isPending}>{t('savePaymentSettings')}</button>
         {!setting.isActive && enabled && (
           <button
             type="button"
+            className="secondary-button"
             disabled={save.isPending}
             onClick={() => {
               if (window.confirm(t(kind === 'payment' ? 'confirmActivateProvider' : 'confirmActivateShipping'))) {
@@ -154,7 +160,7 @@ function SettingField({
     ? `${translatedLabel} (${t('secretNotShown')})`
     : translatedLabel
   return (
-    <label>
+    <label className={field.type === 'boolean' ? 'checkbox-field' : 'settings-field'}>
       {label}
       {field.type === 'select'
         ? <select
