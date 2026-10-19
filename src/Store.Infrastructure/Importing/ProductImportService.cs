@@ -18,7 +18,7 @@ public sealed class ProductImportService(
         byte[] fileBytes,
         bool dryRun,
         bool confirmReimport,
-        string importedBy,
+        Guid importedByUserId,
         CancellationToken cancellationToken)
     {
         var fileHash = Convert.ToHexString(SHA256.HashData(fileBytes));
@@ -120,7 +120,7 @@ public sealed class ProductImportService(
             summary.Warnings,
             summary.Rejected,
             summary.ExactDuplicates,
-            importedBy);
+            importedByUserId);
         foreach (var movement in movements)
         {
             database.StockMovements.Add(new StockMovement(

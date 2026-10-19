@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Store.Api.Auth;
 using Store.Application;
 
 namespace Store.Api.Admin;
@@ -85,11 +86,16 @@ public static class ProductImportEndpoints
         await file.CopyToAsync(upload, cancellationToken);
         try
         {
+            if (user.GetUserId() is not { } importedByUserId)
+            {
+                return Results.Unauthorized();
+            }
+
             var result = await importService.ImportAsync(
                 upload.ToArray(),
                 dryRun,
                 confirmReimport,
-                user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.Identity?.Name ?? "admin",
+                importedByUserId,
                 cancellationToken);
             if (result.ReimportConfirmationRequired)
             {

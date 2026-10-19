@@ -6,6 +6,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Store.Application;
+using Store.Domain;
 using Store.Api.Admin;
 using Store.Infrastructure;
 
@@ -23,6 +24,20 @@ public sealed class ProductImportEndpointTests(PostgreSqlFixture fixture) : ICla
             MakeForm(CsvBytes(""), dryRun: true));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Import_ForbidsCustomers()
+    {
+        using var factory = new TestApiFactory(fixture);
+        using var client = factory.CreateClient();
+        await AuthTestClient.RegisterCustomerAsync(client);
+
+        using var response = await client.PostAsync(
+            "/api/admin/products/import",
+            MakeForm(CsvBytes(""), dryRun: true));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -91,7 +106,8 @@ public sealed class ProductImportEndpointTests(PostgreSqlFixture fixture) : ICla
             Assert.Equal(6, batch.WarningCount);
             Assert.Equal(5, batch.RejectedCount);
             Assert.Equal(1, batch.ExactDuplicateCount);
-            Assert.True(Guid.TryParse(batch.ImportedBy, out _));
+            var admin = await database.Users.SingleAsync(user => user.Role == UserRole.Admin);
+            Assert.Equal(admin.Id, batch.ImportedByUserId);
             var movements = await database.StockMovements
                 .Where(movement => movement.ImportBatchId == batchId)
                 .ToListAsync();

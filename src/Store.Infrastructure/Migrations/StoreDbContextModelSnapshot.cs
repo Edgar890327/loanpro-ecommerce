@@ -146,10 +146,8 @@ namespace Store.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<string>("ImportedBy")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                    b.Property<Guid?>("ImportedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("RejectedCount")
                         .HasColumnType("integer");
@@ -168,6 +166,8 @@ namespace Store.Infrastructure.Migrations
                     b.HasIndex("CreatedAtUtc");
 
                     b.HasIndex("FileHash");
+
+                    b.HasIndex("ImportedByUserId");
 
                     b.ToTable("ImportBatches", (string)null);
                 });
@@ -567,6 +567,14 @@ namespace Store.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
+                });
+
+            modelBuilder.Entity("Store.Domain.ImportBatch", b =>
+                {
+                    b.HasOne("Store.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ImportedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Store.Domain.OrderItem", b =>

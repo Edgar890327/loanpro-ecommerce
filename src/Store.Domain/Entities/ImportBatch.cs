@@ -20,7 +20,7 @@ public sealed class ImportBatch
 
     public int ExactDuplicateCount { get; private set; }
 
-    public string ImportedBy { get; private set; } = string.Empty;
+    public Guid? ImportedByUserId { get; private set; }
 
     public ICollection<StockMovement> StockMovements { get; private set; } = new List<StockMovement>();
 
@@ -37,7 +37,7 @@ public sealed class ImportBatch
         int warningCount,
         int rejectedCount,
         int exactDuplicateCount,
-        string importedBy)
+        Guid importedByUserId)
     {
         FileHash = fileHash;
         CreatedAtUtc = createdAtUtc;
@@ -47,6 +47,6 @@ public sealed class ImportBatch
         WarningCount = warningCount;
         RejectedCount = rejectedCount;
         ExactDuplicateCount = exactDuplicateCount;
-        ImportedBy = importedBy;
+        ImportedByUserId = importedByUserId;
     }
 }

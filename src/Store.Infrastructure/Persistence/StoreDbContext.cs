@@ -105,7 +105,10 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
             entity.Property(batch => batch.WarningCount).IsRequired();
             entity.Property(batch => batch.RejectedCount).IsRequired();
             entity.Property(batch => batch.ExactDuplicateCount).IsRequired();
-            entity.Property(batch => batch.ImportedBy).HasMaxLength(200).IsRequired();
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(batch => batch.ImportedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(batch => batch.FileHash);
             entity.HasIndex(batch => batch.CreatedAtUtc);
         });

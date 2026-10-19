@@ -6,6 +6,6 @@ public interface IProductImportService
         byte[] fileBytes,
         bool dryRun,
         bool confirmReimport,
-        string importedBy,
+        Guid importedByUserId,
         CancellationToken cancellationToken);
 }
