@@ -59,6 +59,21 @@ public sealed class CatalogQueryBuilderTests
     }
 
     [Fact]
+    public void ApplySort_RanksNameContainsAheadOfOtherMatches()
+    {
+        var products = new[]
+        {
+            MakeProduct("Aaa other", "OTHER"),
+            MakeProduct("Zed cafe", "OTHER")
+        };
+        var query = CatalogQueryBuilder.Build("cafe", null, null, null, null, "relevance", 1, 12);
+
+        Assert.Equal(
+            new[] { products[1].Id, products[0].Id },
+            CatalogQueryBuilder.ApplySort(products.AsQueryable(), query).Select(product => product.Id));
+    }
+
+    [Fact]
     public void ApplySort_OrdersPriceAndNameDeterministically()
     {
         var products = new[]

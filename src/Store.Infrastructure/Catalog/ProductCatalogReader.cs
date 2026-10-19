@@ -11,9 +11,12 @@ public sealed class ProductCatalogReader(StoreDbContext database) : IProductCata
         IQueryable<Product> products = database.Products.AsNoTracking();
         if (filters.Query is not null)
         {
-            var pattern = $"%{EscapeLike(filters.Query)}%";
-            products = products.Where(product =>
-                EF.Functions.ILike(product.SearchText, pattern, "\\"));
+            foreach (var term in filters.Query.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var pattern = $"%{EscapeLike(term)}%";
+                products = products.Where(product =>
+                    EF.Functions.ILike(product.SearchText, pattern, "\\"));
+            }
         }
 
         if (filters.Category is not null)

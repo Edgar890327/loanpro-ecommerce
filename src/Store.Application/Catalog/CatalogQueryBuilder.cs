@@ -40,7 +40,9 @@ public static class CatalogQueryBuilder
                 ? 0
                 : product.NameNormalized.StartsWith(query) || product.SkuNormalized.StartsWith(query)
                     ? 1
-                    : 2;
+                    : product.NameNormalized.Contains(query) || product.SkuNormalized.Contains(query)
+                        ? 2
+                        : 3;
 
     public static IOrderedQueryable<Product> ApplySort(IQueryable<Product> products, CatalogQuery query) =>
         query.Sort switch

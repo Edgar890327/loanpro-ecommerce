@@ -62,7 +62,7 @@ public sealed class PublicCatalogEndpointTests(PostgreSqlFixture fixture) : ICla
             $"/api/catalog?q={relevanceQuery}&sort=relevance&page=1&pageSize=10");
         Assert.Equal(
             new[] { products[5].Id, products[6].Id },
-            relevanceResults!.Items.Select(product => product.Id));
+            relevanceResults!.Items.Take(2).Select(product => product.Id));
 
         var exactSpecialQuery = Uri.EscapeDataString($"Café, \"Classic\" {suffix}");
         var specialMatch = await client.GetFromJsonAsync<CatalogPage>(
@@ -98,6 +98,32 @@ public sealed class PublicCatalogEndpointTests(PostgreSqlFixture fixture) : ICla
 
         using var deletedDetail = await client.GetAsync($"/api/catalog/{products[2].Id}");
         Assert.Equal(HttpStatusCode.NotFound, deletedDetail.StatusCode);
+    }
+
+    [Fact]
+    public async Task Catalog_MatchesEveryTermRegardlessOfOrderAndAcrossFields()
+    {
+        using var factory = new TestApiFactory(fixture);
+        using var client = factory.CreateClient();
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var category = new Category($"Terms-{suffix}");
+        var matching = MakeProduct($"Pour over kettle {suffix}", $"KET-{suffix}", "Gooseneck for coffee", category, 30m, 4);
+        var partial = MakeProduct($"Pour over filter {suffix}", $"FIL-{suffix}", "Paper", category, 5m, 4);
+        var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<StoreDbContext>>();
+        await using (var database = await contextFactory.CreateDbContextAsync())
+        {
+            database.Products.AddRange(matching, partial);
+            await database.SaveChangesAsync();
+        }
+
+        var result = await client.GetFromJsonAsync<CatalogPage>(
+            $"/api/catalog?q={Uri.EscapeDataString($"kettle {suffix} COFFEE")}");
+
+        var item = Assert.Single(result!.Items);
+        Assert.Equal(matching.Id, item.Id);
+        var reordered = await client.GetFromJsonAsync<CatalogPage>(
+            $"/api/catalog?q={Uri.EscapeDataString($"coffee kettle")}&category={Uri.EscapeDataString(category.Name)}");
+        Assert.Equal(matching.Id, Assert.Single(reordered!.Items).Id);
     }
 
     [Fact]
