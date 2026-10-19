@@ -45,6 +45,28 @@ public sealed class ShippingSettingsEndpointTests(PostgreSqlFixture fixture) : I
         Assert.Equal(12.50m, orderJson.RootElement.GetProperty("shipping").GetDecimal());
     }
 
+    [Fact]
+    public async Task CustomersCannotUseSettingsButAnyoneCanRequestAQuote()
+    {
+        using var factory = new TestApiFactory(fixture);
+        using var admin = factory.CreateClient();
+        await SignInAsync(admin, factory.AdminPassword);
+        var productId = await CreateProductAsync(admin);
+        await SaveShippingRateAsync(admin, "3.25");
+        using var customer = factory.CreateClient();
+        await AuthTestClient.RegisterCustomerAsync(customer);
+        using var anonymous = factory.CreateClient();
+
+        using var list = await customer.GetAsync("/api/admin/settings");
+        using var save = await customer.PutAsJsonAsync(
+            "/api/admin/settings/shipping/flat-rate",
+            new { publicConfiguration = new { amountUsd = "1.00" }, secrets = new { }, enabled = true, activate = true });
+
+        Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, save.StatusCode);
+        Assert.Equal(3.25m, await QuoteAsync(anonymous, productId));
+    }
+
     private static async Task<decimal> QuoteAsync(HttpClient client, Guid productId)
     {
         using var response = await client.PostAsJsonAsync(
