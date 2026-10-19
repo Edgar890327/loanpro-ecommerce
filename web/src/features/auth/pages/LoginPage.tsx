@@ -1,58 +1,74 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, apiRequest } from '../../../shared/api/api'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { translateApiError } from '../../../shared/api/api'
 import { useAuth } from '../../../shared/auth/auth-context'
-
-type LoginResponse = {
-  accessToken: string
-  expiresAtUtc: string
-}
+import { resolveReturnUrl } from '../../../shared/auth/returnUrl'
+import { validateLoginForm } from '../../../shared/validation/authValidation'
+import type { AuthFormErrors } from '../../../shared/validation/authValidation'
+import { AuthField } from '../../../components/molecules/AuthField'
 
 export function LoginPage() {
   const { t } = useTranslation()
-  const { signIn } = useAuth()
-  const location = useLocation()
+  const { login } = useAuth()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  const [errors, setErrors] = useState<AuthFormErrors>({})
+  const [serverError, setServerError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const returnUrl = params.get('returnUrl')
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setError('')
+    setServerError('')
+    const validation = validateLoginForm({ email, password }, {
+      emailInvalid: t('emailInvalid'),
+      fullNameRequired: t('fullNameRequired'),
+      passwordLength: t('passwordLength'),
+      passwordRequired: t('passwordRequired'),
+    })
+    setErrors(validation)
+    if (Object.keys(validation).length > 0) return
+    setIsSubmitting(true)
     try {
-      const result = await apiRequest<LoginResponse>('/auth/login', null, {
-        method: 'POST',
-        body: JSON.stringify({ password }),
-      })
-      signIn(result.accessToken)
-      const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
-      navigate(destination ?? '/admin/products', { replace: true })
-    } catch (loginError) {
-      setError(loginError instanceof ApiError && loginError.status === 401
-        ? t('invalidCredentials')
-        : t('requestFailed'))
+      const user = await login(email.trim(), password)
+      navigate(resolveReturnUrl(user, returnUrl), { replace: true })
+    } catch (error) {
+      setServerError(translateApiError(error, t))
+    } finally {
+      setIsSubmitting(false)
     }
   }
+
+  const registerLink = returnUrl ? `/register?returnUrl=${encodeURIComponent(returnUrl)}` : '/register'
 
   return (
     <section className="panel form-panel">
       <h1>{t('loginTitle')}</h1>
       <form onSubmit={(event) => void submit(event)} noValidate>
-        <label>
-          {t('password')}
-          <input
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-        </label>
-        {error && <p role="alert" className="form-error">{error}</p>}
-        <button className="primary-button" type="submit">{t('signIn')}</button>
+        <AuthField
+          label={t('email')}
+          type="email"
+          autoComplete="email"
+          value={email}
+          error={errors.email}
+          onChange={setEmail}
+        />
+        <AuthField
+          label={t('password')}
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          error={errors.password}
+          onChange={setPassword}
+        />
+        {serverError && <p role="alert" className="form-error">{serverError}</p>}
+        <button className="primary-button" type="submit" disabled={isSubmitting}>{t('signIn')}</button>
       </form>
+      <p>{t('noAccount')} <Link to={registerLink}>{t('register')}</Link></p>
     </section>
   )
 }

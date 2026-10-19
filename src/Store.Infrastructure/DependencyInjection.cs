@@ -56,6 +56,10 @@ public static class DependencyInjection
             provider => provider.GetRequiredService<ShippingStrategyRegistry>());
         services.AddScoped<IShippingQuoteService, ShippingQuoteService>();
         services.AddScoped<IOrderService, OrderService>();
+        services.AddSingleton<IPasswordHasher, Store.Infrastructure.Identity.AspNetPasswordHasher>();
+        services.AddScoped<IUserRepository, Store.Infrastructure.Identity.UserRepository>();
+        services.AddScoped<IAccountService, AccountService>();
+        services.AddScoped<AdminSeeder>();
         services.AddScoped<IOrderHistoryReader, OrderHistoryReader>();
         services.AddScoped<IE2eDataReset, E2eDataReset>();
         var reservationTtlSeconds = configuration.GetValue<int?>("RESERVATION_TTL_SECONDS");

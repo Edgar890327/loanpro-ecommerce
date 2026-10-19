@@ -16,7 +16,7 @@ namespace Store.IntegrationTests;
 public sealed class ProductAdminEndpointTests(PostgreSqlFixture fixture) : IClassFixture<PostgreSqlFixture>
 {
     [Fact]
-    public async Task AdminEndpoints_RequireBearerToken()
+    public async Task AdminEndpoints_RequireASession()
     {
         using var factory = new TestApiFactory(fixture);
         using var client = factory.CreateClient();
@@ -211,10 +211,7 @@ public sealed class ProductAdminEndpointTests(PostgreSqlFixture fixture) : IClas
         using var resetResponse = await e2eClient.PostAsync("/e2e/reset", null);
         Assert.Equal(HttpStatusCode.NoContent, resetResponse.StatusCode);
 
-        using var loginResponse = await e2eClient.PostAsJsonAsync(
-            "/auth/login",
-            new { password = e2eFactory.AdminPassword });
-        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+        await AuthTestClient.SignInAsync(e2eClient, TestApiFactory.AdminEmail, e2eFactory.AdminPassword);
         using var catalogResponse = await e2eClient.GetAsync("/api/catalog?q=E2E-ESPRESSO");
         Assert.Equal(HttpStatusCode.OK, catalogResponse.StatusCode);
         using var catalog = await JsonDocument.ParseAsync(
@@ -230,22 +227,15 @@ public sealed class ProductAdminEndpointTests(PostgreSqlFixture fixture) : IClas
         using var factory = new TestApiFactory(fixture);
         using var client = factory.CreateClient();
 
-        using var response = await client.PostAsJsonAsync("/auth/login", new { password = "wrong" });
+        using var response = await client.PostAsJsonAsync(
+            "/auth/login",
+            new { email = TestApiFactory.AdminEmail, password = "wrong" });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    private static async Task SignInAsync(HttpClient client, string adminPassword)
-    {
-        using var response = await client.PostAsJsonAsync(
-            "/auth/login",
-            new { password = adminPassword });
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var token = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        Assert.NotNull(token);
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token.AccessToken);
-    }
+    private static Task SignInAsync(HttpClient client, string adminPassword) =>
+        AuthTestClient.SignInAsync(client, TestApiFactory.AdminEmail, adminPassword);
 
     private static ProductRequest CreateProduct(
         string name,
@@ -265,5 +255,4 @@ public sealed class ProductAdminEndpointTests(PostgreSqlFixture fixture) : IClas
         StatusCode = 500
     };
 
-    private sealed record LoginResponse(string AccessToken, DateTimeOffset ExpiresAtUtc);
 }

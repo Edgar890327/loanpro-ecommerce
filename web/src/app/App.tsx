@@ -5,6 +5,7 @@ import { ProtectedRoute } from '../shared/auth/ProtectedRoute'
 import { NotFoundPage } from './NotFoundPage'
 import { Layout } from '../components/templates/Layout'
 import { LoginPage } from '../features/auth/pages/LoginPage'
+import { RegisterPage } from '../features/auth/pages/RegisterPage'
 import { ProductImportPage } from '../features/import/pages/ProductImportPage'
 import { ProductFormPage } from '../features/products/pages/ProductFormPage'
 import { ProductListPage } from '../features/products/pages/ProductListPage'
@@ -32,9 +33,10 @@ const router = createBrowserRouter([
       { path: '/checkout', element: <CheckoutPage /> },
       { path: '/orders/:id', element: <OrderStatusPage /> },
       { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
       {
         path: '/admin',
-        element: <ProtectedRoute><Outlet /></ProtectedRoute>,
+        element: <ProtectedRoute role="Admin"><Outlet /></ProtectedRoute>,
         children: [
           { index: true, element: <Navigate to="products" replace /> },
           { path: 'products', element: <ProductListPage /> },

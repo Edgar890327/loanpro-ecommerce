@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { apiRequest, translateApiError } from '../../../shared/api/api'
-import { useAuth } from '../../../shared/auth/auth-context'
 import type { StoreSettings, SettingSchema } from '../types/StoreSettings'
 import { LoadingSkeleton } from '../../../components/atoms/LoadingSkeleton'
 
@@ -13,10 +12,9 @@ type Draft = {
 
 export function SettingsPage() {
   const { t } = useTranslation()
-  const { token } = useAuth()
   const settings = useQuery({
     queryKey: ['store-settings'],
-    queryFn: () => apiRequest<StoreSettings>('/api/admin/settings', token),
+    queryFn: () => apiRequest<StoreSettings>('/api/admin/settings'),
   })
 
   if (settings.isLoading) return <LoadingSkeleton rows={5} />
@@ -64,7 +62,6 @@ function SettingsEditor({
   kind: 'payment' | 'shipping'
 }) {
   const { t } = useTranslation()
-  const { token } = useAuth()
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<Draft>({
     publicConfiguration: setting.publicConfiguration,
@@ -72,7 +69,7 @@ function SettingsEditor({
   })
   const [enabled, setEnabled] = useState(setting.isEnabled)
   const save = useMutation({
-    mutationFn: (activate: boolean) => apiRequest<SettingSchema>(endpoint, token, {
+    mutationFn: (activate: boolean) => apiRequest<SettingSchema>(endpoint, {
       method: 'PUT',
       body: JSON.stringify({ ...draft, enabled, activate }),
     }),

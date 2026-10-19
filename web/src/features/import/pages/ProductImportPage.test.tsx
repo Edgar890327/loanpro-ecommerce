@@ -2,7 +2,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AuthProvider } from '../../../shared/auth/auth'
 import { ProductImportPage } from './ProductImportPage'
 import i18n from '../../../shared/i18n/i18n'
 
@@ -33,17 +32,14 @@ function renderImportPage() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
-  sessionStorage.setItem('store-admin-token', 'admin-token')
   return render(
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={['/admin/products/import']}>
-          <Routes>
-            <Route path="/admin/products/import" element={<ProductImportPage />} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    </AuthProvider>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/admin/products/import']}>
+        <Routes>
+          <Route path="/admin/products/import" element={<ProductImportPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   )
 }
 
@@ -56,7 +52,6 @@ function jsonResponse(body: unknown) {
 describe('product CSV import page', () => {
   afterEach(() => {
     cleanup()
-    sessionStorage.clear()
     vi.unstubAllGlobals()
     void i18n.changeLanguage('en-US')
   })

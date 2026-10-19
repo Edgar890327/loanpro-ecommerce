@@ -855,3 +855,13 @@ th {
     width: 100%;
   }
 }
+
+.account-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.account-name {
+  font-weight: 600;
+}

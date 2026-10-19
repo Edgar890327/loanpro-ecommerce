@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ApiError, apiRequest, translateApiError } from '../../../shared/api/api'
-import { useAuth } from '../../../shared/auth/auth-context'
 import { validateProductForm } from '../../../shared/validation/productValidation'
 import { NumberField } from '../../../components/molecules/NumberField'
 import { TextField } from '../../../components/molecules/TextField'
@@ -16,13 +15,12 @@ type ProductErrors = Partial<Record<'name' | 'sku' | 'category' | 'price' | 'sto
 
 export function ProductFormPage() {
   const { t } = useTranslation()
-  const { token } = useAuth()
   const navigate = useNavigate()
   const { id } = useParams()
   const queryClient = useQueryClient()
   const existing = useQuery({
     queryKey: ['product', id],
-    queryFn: () => apiRequest<Product>(`/api/admin/products/${id}`, token),
+    queryFn: () => apiRequest<Product>(`/api/admin/products/${id}`),
     enabled: Boolean(id),
   })
   const [values, setValues] = useState<ProductInput>({
@@ -54,8 +52,7 @@ export function ProductFormPage() {
 
   const saveProduct = useMutation({
     mutationFn: (input: ProductInput) => apiRequest<Product>(
-      id ? `/api/admin/products/${id}` : '/api/admin/products',
-      token,
+      id ? `/api/admin/products/${id}` : '/api/admin/products', 
       { method: id ? 'PUT' : 'POST', body: JSON.stringify(input) },
     ),
     onSuccess: async () => {

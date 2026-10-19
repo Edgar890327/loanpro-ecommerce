@@ -7,7 +7,7 @@ public static class ErrorLogEndpoints
     public static RouteGroupBuilder MapErrorLogEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/admin/error-logs")
-            .RequireAuthorization("Admin");
+            .RequireAuthorization(Store.Api.Auth.AuthorizationPolicies.AdminOnly);
         group.MapGet("/", ListAsync);
         return group;
     }

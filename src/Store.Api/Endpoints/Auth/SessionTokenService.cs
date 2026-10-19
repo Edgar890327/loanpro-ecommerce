@@ -1,15 +1,15 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Store.Application;
 
 namespace Store.Api.Auth;
 
-public sealed class AdminTokenService(IOptions<JwtOptions> options, TimeProvider timeProvider)
+public sealed class SessionTokenService(IOptions<JwtOptions> options, TimeProvider timeProvider)
 {
-    public AdminToken Issue()
+    public SessionToken Issue(UserProfile profile)
     {
         var settings = options.Value;
         var now = timeProvider.GetUtcNow();
@@ -21,20 +21,13 @@ public sealed class AdminTokenService(IOptions<JwtOptions> options, TimeProvider
             settings.Issuer,
             settings.Audience,
             [
-                new Claim(ClaimTypes.NameIdentifier, "admin"),
-                new Claim(ClaimTypes.Role, "Administrator")
+                new Claim(ClaimTypes.NameIdentifier, profile.Id.ToString("D")),
+                new Claim(ClaimTypes.Role, profile.Role.ToString())
             ],
             now.UtcDateTime,
             expiresAt.UtcDateTime,
             credentials);
 
-        return new AdminToken(new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
-    }
-
-    public static bool PasswordMatches(string supplied, string configured)
-    {
-        var suppliedHash = SHA256.HashData(Encoding.UTF8.GetBytes(supplied));
-        var configuredHash = SHA256.HashData(Encoding.UTF8.GetBytes(configured));
-        return CryptographicOperations.FixedTimeEquals(suppliedHash, configuredHash);
+        return new SessionToken(new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
     }
 }

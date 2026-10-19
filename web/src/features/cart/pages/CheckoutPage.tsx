@@ -33,7 +33,7 @@ export function CheckoutPage() {
     if (!shippingAddress.trim()) return
     let active = true
     const timeout = window.setTimeout(() => {
-      void apiRequest<ShippingQuote>('/api/shipping/quote', null, {
+      void apiRequest<ShippingQuote>('/api/shipping/quote', {
         method: 'POST',
         body: JSON.stringify({
           items: items.map(({ productId, quantity }) => ({ productId, quantity })),
@@ -59,7 +59,7 @@ export function CheckoutPage() {
       const retrying = idempotencyKey.current !== null
       idempotencyKey.current ??= createIdempotencyKey()
       if (!retrying) {
-        const cart = await apiRequest<CartValidation>('/api/cart/validate', null, {
+        const cart = await apiRequest<CartValidation>('/api/cart/validate', {
           method: 'POST',
           body: JSON.stringify({ items: items.map(({ productId, quantity }) => ({ productId, quantity })) }),
         })
@@ -70,7 +70,7 @@ export function CheckoutPage() {
         }
       }
 
-      const order = await apiRequest<Order>('/api/orders', null, {
+      const order = await apiRequest<Order>('/api/orders', {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey.current },
         body: JSON.stringify({

@@ -110,15 +110,8 @@ public sealed class ShippingSettingsEndpointTests(PostgreSqlFixture fixture) : I
             document.RootElement.GetProperty("shipping").GetDecimal());
     }
 
-    private static async Task SignInAsync(HttpClient client, string password)
-    {
-        using var response = await client.PostAsJsonAsync("/auth/login", new { password });
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer",
-            document.RootElement.GetProperty("accessToken").GetString());
-    }
+    private static Task SignInAsync(HttpClient client, string password) =>
+        AuthTestClient.SignInAsync(client, TestApiFactory.AdminEmail, password);
 
     private static string NewCapability() => Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
 

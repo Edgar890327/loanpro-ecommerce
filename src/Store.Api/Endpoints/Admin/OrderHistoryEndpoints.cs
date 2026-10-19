@@ -7,7 +7,7 @@ public static class OrderHistoryEndpoints
     public static void MapOrderHistoryEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/admin/orders", ListAsync)
-            .RequireAuthorization("Admin")
+            .RequireAuthorization(Store.Api.Auth.AuthorizationPolicies.AdminOnly)
             .WithName("GetAdminOrderHistory")
             .WithSummary("List orders for store administration")
             .Produces<OrderHistoryPageResponse>()

@@ -7,6 +7,8 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
 {
     public DbSet<ErrorLog> ErrorLogs => Set<ErrorLog>();
 
+    public DbSet<User> Users => Set<User>();
+
     public DbSet<Category> Categories => Set<Category>();
 
     public DbSet<Product> Products => Set<Product>();
@@ -31,6 +33,21 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
     {
         modelBuilder.HasPostgresExtension("pg_trgm");
         modelBuilder.HasPostgresExtension("unaccent");
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("Users");
+            entity.HasKey(user => user.Id);
+            entity.Property(user => user.Email).HasMaxLength(320).IsRequired();
+            entity.Property(user => user.EmailNormalized).HasMaxLength(320).IsRequired();
+            entity.Property(user => user.PasswordHash).HasMaxLength(512).IsRequired();
+            entity.Property(user => user.FullName).HasMaxLength(200).IsRequired();
+            entity.Property(user => user.Role).HasConversion<string>().HasMaxLength(20).IsRequired();
+            entity.Property(user => user.PreferredLocale).HasMaxLength(10);
+            entity.Property(user => user.IsActive).IsRequired();
+            entity.Property(user => user.CreatedAtUtc).IsRequired();
+            entity.HasIndex(user => user.EmailNormalized).IsUnique();
+        });
 
         modelBuilder.Entity<Category>(entity =>
         {

@@ -8,7 +8,7 @@ public static class ProductEndpoints
     public static RouteGroupBuilder MapProductEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/admin/products")
-            .RequireAuthorization("Admin");
+            .RequireAuthorization(Store.Api.Auth.AuthorizationPolicies.AdminOnly);
         group.MapPost("/", CreateAsync);
         group.MapGet("/", ListAsync);
         group.MapGet("/{id:guid}", GetAsync);

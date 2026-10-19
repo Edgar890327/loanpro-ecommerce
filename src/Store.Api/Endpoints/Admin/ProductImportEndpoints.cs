@@ -11,7 +11,7 @@ public static class ProductImportEndpoints
     public static RouteGroupBuilder MapProductImportEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/admin/products")
-            .RequireAuthorization("Admin");
+            .RequireAuthorization(Store.Api.Auth.AuthorizationPolicies.AdminOnly);
         group.MapPost("/import", ImportAsync)
             .DisableAntiforgery()
             .WithMetadata(new RequestSizeLimitAttribute(ProductCsvParser.MaxFileSizeBytes + MultipartOverheadBytes))

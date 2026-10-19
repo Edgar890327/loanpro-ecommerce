@@ -258,15 +258,9 @@ public sealed class OrderEndpointTests(PostgreSqlFixture fixture) : IClassFixtur
         return await client.SendAsync(request);
     }
 
-    private static async Task SignInAsync(HttpClient client, string password)
-    {
-        using var response = await client.PostAsJsonAsync("/auth/login", new { password });
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var token = await response.Content.ReadFromJsonAsync<LoginPayload>();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token!.AccessToken);
-    }
+    private static Task SignInAsync(HttpClient client, string password) =>
+        AuthTestClient.SignInAsync(client, TestApiFactory.AdminEmail, password);
 
-    private sealed record LoginPayload(string AccessToken);
 
     private sealed record OrderPayload(Guid Id, string State);
 }

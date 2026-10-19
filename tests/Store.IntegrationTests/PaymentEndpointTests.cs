@@ -243,17 +243,11 @@ public sealed class PaymentEndpointTests(PostgreSqlFixture fixture) : IClassFixt
         return (await response.Content.ReadFromJsonAsync<OrderData>())!;
     }
 
-    private static async Task SignInAsync(HttpClient client, string password)
-    {
-        using var response = await client.PostAsJsonAsync("/auth/login", new { password });
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var token = await response.Content.ReadFromJsonAsync<LoginData>();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token!.AccessToken);
-    }
+    private static Task SignInAsync(HttpClient client, string password) =>
+        AuthTestClient.SignInAsync(client, TestApiFactory.AdminEmail, password);
 
     private static string NewCapability() => Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
 
-    private sealed record LoginData(string AccessToken);
 
     private sealed record OrderData(Guid Id, string State);
 

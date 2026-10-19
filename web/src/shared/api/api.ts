@@ -25,22 +25,29 @@ export class ApiError extends Error {
   }
 }
 
+export const csrfHeaderName = 'X-Requested-With'
+export const csrfHeaderValue = 'store'
+
+const mutatingMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+
 export async function apiRequest<T>(
   path: string,
-  token?: string | null,
   init: RequestInit = {},
 ): Promise<T> {
   const headers = new Headers(init.headers)
   if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`)
+  if (mutatingMethods.has((init.method ?? 'GET').toUpperCase())) {
+    headers.set(csrfHeaderName, csrfHeaderValue)
   }
 
-  const response = await fetch(path, { ...init, headers })
+  const response = await fetch(path, { ...init, headers, credentials: 'same-origin' })
   if (response.status === 401) {
     window.dispatchEvent(new Event('store:unauthorized'))
+  }
+  if (response.status === 403) {
+    window.dispatchEvent(new Event('store:forbidden'))
   }
   if (!response.ok) {
     const problem = await response.json().catch(() => null) as {

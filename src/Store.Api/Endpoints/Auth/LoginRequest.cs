@@ -1,3 +1,3 @@
-namespace Store.Api;
+namespace Store.Api.Auth;
 
-public sealed record LoginRequest(string? Password);
+public sealed record LoginRequest(string? Email, string? Password);

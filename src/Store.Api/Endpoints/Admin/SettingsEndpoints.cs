@@ -6,7 +6,7 @@ public static class SettingsEndpoints
 {
     public static void MapSettingsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/admin/settings").RequireAuthorization("Admin");
+        var group = endpoints.MapGroup("/api/admin/settings").RequireAuthorization(Store.Api.Auth.AuthorizationPolicies.AdminOnly);
         group.MapGet("/", GetAsync)
             .WithName("GetStoreSettings")
             .WithSummary("List payment and shipping settings with their schemas")

@@ -28,7 +28,7 @@ export function OrderStatusPage() {
   })
   const accessKey = id ? window.localStorage.getItem(`store:order-access:${id}`) : null
   const cancel = useMutation({
-    mutationFn: () => apiRequest<Order>(`/api/orders/${id}/cancel`, null, {
+    mutationFn: () => apiRequest<Order>(`/api/orders/${id}/cancel`, {
       method: 'POST',
       headers: { 'Idempotency-Key': accessKey ?? '' },
     }),

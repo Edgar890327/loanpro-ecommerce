@@ -6,7 +6,7 @@ public static class PaymentProviderEndpoints
 {
     public static void MapPaymentProviderEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/admin/payment-providers").RequireAuthorization("Admin");
+        var group = endpoints.MapGroup("/api/admin/payment-providers").RequireAuthorization(Store.Api.Auth.AuthorizationPolicies.AdminOnly);
         group.MapGet("/", ListAsync)
             .WithName("ListPaymentProviderSettings")
             .WithSummary("List available payment providers and public configuration")

@@ -14,7 +14,7 @@ export function CartPage() {
   const [stockChanged, setStockChanged] = useState(false)
   const validation = useQuery({
     queryKey: ['cart-validation', items.map((item) => `${item.productId}:${item.quantity}`).join(',')],
-    queryFn: () => apiRequest<CartValidation>('/api/cart/validate', null, {
+    queryFn: () => apiRequest<CartValidation>('/api/cart/validate', {
       method: 'POST',
       body: JSON.stringify({ items: items.map(({ productId, quantity }) => ({ productId, quantity })) }),
     }),

@@ -13,21 +13,34 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
     public TestApiFactory(
         PostgreSqlFixture fixture,
         int? reservationTtlSeconds = null,
-        bool e2eMode = false)
+        bool e2eMode = false,
+        int authRateLimitPerMinute = 1000)
     {
         _e2eMode = e2eMode;
-        AdminPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         SetEnvironment("ConnectionStrings__DefaultConnection", fixture.ConnectionString);
+        SetEnvironment("ADMIN_EMAIL", AdminEmail);
         SetEnvironment("ADMIN_PASSWORD", AdminPassword);
+        SetEnvironment("AUTH_RATE_LIMIT_PER_MINUTE", authRateLimitPerMinute.ToString());
         SetEnvironment("JWT_SECRET", Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)));
-        SetEnvironment("JWT_EXPIRY_MINUTES", "15");
+        SetEnvironment("JWT_EXPIRY_MINUTES", "30");
         SetEnvironment("ERROR_LOG_RETENTION_DAYS", "30");
         SetEnvironment("Shipping__FlatRateUsd", "0");
         SetEnvironment("RESERVATION_TTL_SECONDS", (reservationTtlSeconds ?? 900).ToString());
         SetEnvironment("RESERVATION_SCAN_INTERVAL_SECONDS", reservationTtlSeconds.HasValue ? "1" : "15");
     }
 
-    public string AdminPassword { get; }
+    public const string AdminEmail = "admin@store.test";
+
+    private static readonly string SharedAdminPassword =
+        Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
+    public string AdminPassword => SharedAdminPassword;
+
+    protected override void ConfigureClient(HttpClient client)
+    {
+        base.ConfigureClient(client);
+        client.DefaultRequestHeaders.Add("X-Requested-With", "store");
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

@@ -7,8 +7,11 @@ using Store.Api.Admin;
 using Store.Api.Auth;
 using Store.Api.E2e;
 using Store.Application;
+using Store.Domain;
 using Store.Infrastructure;
 using System.Text;
+using System.Threading.RateLimiting;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,11 +30,30 @@ builder.Services.AddInfrastructure(builder.Configuration);
 var jwtOptions = new JwtOptions
 {
     Secret = builder.Configuration["JWT_SECRET"] ?? string.Empty,
-    ExpiryMinutes = builder.Configuration.GetValue("JWT_EXPIRY_MINUTES", 15)
+    ExpiryMinutes = builder.Configuration.GetValue("JWT_EXPIRY_MINUTES", 30)
 };
-if (string.IsNullOrWhiteSpace(builder.Configuration["ADMIN_PASSWORD"]))
+var adminEmail = builder.Configuration["ADMIN_EMAIL"];
+var adminPassword = builder.Configuration["ADMIN_PASSWORD"];
+if (string.IsNullOrWhiteSpace(adminEmail) || !System.Net.Mail.MailAddress.TryCreate(adminEmail.Trim(), out _))
 {
-    throw new InvalidOperationException("ADMIN_PASSWORD is required.");
+    throw new InvalidOperationException("ADMIN_EMAIL must be a valid email address.");
+}
+
+if (adminPassword is null || adminPassword.Length is < 8 or > 128)
+{
+    throw new InvalidOperationException("ADMIN_PASSWORD must contain between 8 and 128 characters.");
+}
+
+var authOptions = new AuthOptions
+{
+    CookieName = builder.Configuration["AUTH_COOKIE_NAME"] is { Length: > 0 } cookieName
+        ? cookieName
+        : "store_session",
+    RateLimitPerMinute = builder.Configuration.GetValue("AUTH_RATE_LIMIT_PER_MINUTE", 10)
+};
+if (authOptions.RateLimitPerMinute < 1)
+{
+    throw new InvalidOperationException("AUTH_RATE_LIMIT_PER_MINUTE must be positive.");
 }
 
 if (Encoding.UTF8.GetByteCount(jwtOptions.Secret) < 32)
@@ -50,7 +72,33 @@ builder.Services.Configure<JwtOptions>(options =>
     options.Secret = jwtOptions.Secret;
     options.ExpiryMinutes = jwtOptions.ExpiryMinutes;
 });
-builder.Services.AddSingleton<AdminTokenService>();
+builder.Services.AddSingleton(Options.Create(authOptions));
+builder.Services.AddSingleton<SessionTokenService>();
+builder.Services.AddSingleton<EmailAttemptLimiter>();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = authOptions.RateLimitPerMinute,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new Dictionary<string, object?>
+            {
+                ["status"] = StatusCodes.Status429TooManyRequests,
+                ["title"] = "Too many attempts. Try again later.",
+                ["code"] = "RATE_LIMITED"
+            },
+            cancellationToken);
+    };
+});
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -65,13 +113,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30)
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                context.Token = context.Request.Cookies[authOptions.CookieName];
+                return Task.CompletedTask;
+            }
+        };
     });
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("Admin", policy => policy
-        .RequireAuthenticatedUser()
-        .RequireRole("Administrator"));
-});
+builder.Services.AddAuthorization(AuthorizationPolicies.Configure);
 
 var app = builder.Build();
 
@@ -82,7 +133,9 @@ app.UseExceptionHandler(new ExceptionHandlerOptions
 {
     SuppressDiagnosticsCallback = _ => true
 });
+app.UseMiddleware<CsrfHeaderMiddleware>();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.UseStatusCodePages();
 app.UseSwagger();
@@ -139,6 +192,9 @@ await using (var scope = app.Services.CreateAsyncScope())
     await scope.ServiceProvider
         .GetRequiredService<Store.Application.IShippingStrategyRegistry>()
         .EnsureInitializedAsync(CancellationToken.None);
+    await scope.ServiceProvider
+        .GetRequiredService<AdminSeeder>()
+        .EnsureAsync(adminEmail, adminPassword, CancellationToken.None);
 }
 
 app.Run();

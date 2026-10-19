@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { apiRequest, translateApiError } from '../../../shared/api/api'
-import { useAuth } from '../../../shared/auth/auth-context'
 import { formatCurrency, formatDate } from '../../../shared/i18n/format'
 import { LoadingSkeleton } from '../../../components/atoms/LoadingSkeleton'
 import type { OrderHistoryPageData } from '../types/OrderHistory'
@@ -11,13 +10,11 @@ const pageSize = 20
 
 export function OrderHistoryPage() {
   const { t, i18n } = useTranslation()
-  const { token } = useAuth()
   const [page, setPage] = useState(1)
   const orders = useQuery({
     queryKey: ['admin-order-history', page],
     queryFn: () => apiRequest<OrderHistoryPageData>(
-      `/api/admin/orders?page=${page}&pageSize=${pageSize}`,
-      token,
+      `/api/admin/orders?page=${page}&pageSize=${pageSize}`, 
     ),
   })
   const pages = Math.max(1, Math.ceil((orders.data?.totalCount ?? 0) / pageSize))

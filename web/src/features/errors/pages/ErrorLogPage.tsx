@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { apiRequest, translateApiError } from '../../../shared/api/api'
-import { useAuth } from '../../../shared/auth/auth-context'
 import { useNotifications } from '../../../shared/notifications/useNotifications'
 import { formatDate } from '../../../shared/i18n/format'
 import { LoadingSkeleton } from '../../../components/atoms/LoadingSkeleton'
@@ -12,7 +11,6 @@ const pageSize = 20
 
 export function ErrorLogPage() {
   const { t, i18n } = useTranslation()
-  const { token } = useAuth()
   const { notify } = useNotifications()
   const [fromDateInput, setFromDateInput] = useState('')
   const [toDateInput, setToDateInput] = useState('')
@@ -35,7 +33,7 @@ export function ErrorLogPage() {
   if (correlationId) query.set('correlationId', correlationId.trim())
   const logs = useQuery({
     queryKey: ['error-logs', fromDate, toDate, level, correlationId, page],
-    queryFn: () => apiRequest<ErrorLogPageData>(`/api/admin/error-logs?${query}`, token),
+    queryFn: () => apiRequest<ErrorLogPageData>(`/api/admin/error-logs?${query}`),
   })
   const pages = Math.max(1, Math.ceil((logs.data?.totalCount ?? 0) / pageSize))
 

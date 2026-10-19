@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AuthProvider } from '../../../shared/auth/auth'
 import i18n from '../../../shared/i18n/i18n'
 import { SettingsPage } from './SettingsPage'
 
@@ -61,16 +60,13 @@ const settings = {
 }
 
 function renderSettingsPage() {
-  sessionStorage.setItem('store-admin-token', 'admin-token')
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return render(
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <SettingsPage />
-      </QueryClientProvider>
-    </AuthProvider>,
+    <QueryClientProvider client={queryClient}>
+      <SettingsPage />
+    </QueryClientProvider>,
   )
 }
 
@@ -83,7 +79,6 @@ function jsonResponse(body: unknown) {
 describe('store settings page', () => {
   afterEach(() => {
     cleanup()
-    sessionStorage.clear()
     vi.unstubAllGlobals()
     void i18n.changeLanguage('en-US')
   })

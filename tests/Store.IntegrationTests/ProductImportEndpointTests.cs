@@ -91,7 +91,7 @@ public sealed class ProductImportEndpointTests(PostgreSqlFixture fixture) : ICla
             Assert.Equal(6, batch.WarningCount);
             Assert.Equal(5, batch.RejectedCount);
             Assert.Equal(1, batch.ExactDuplicateCount);
-            Assert.Equal("admin", batch.ImportedBy);
+            Assert.True(Guid.TryParse(batch.ImportedBy, out _));
             var movements = await database.StockMovements
                 .Where(movement => movement.ImportBatchId == batchId)
                 .ToListAsync();
@@ -179,14 +179,8 @@ public sealed class ProductImportEndpointTests(PostgreSqlFixture fixture) : ICla
         Assert.Equal(HttpStatusCode.BadRequest, badResponse.StatusCode);
     }
 
-    private static async Task SignInAsync(HttpClient client, string adminPassword)
-    {
-        using var response = await client.PostAsJsonAsync("/auth/login", new { password = adminPassword });
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var token = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        Assert.NotNull(token);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
-    }
+    private static Task SignInAsync(HttpClient client, string adminPassword) =>
+        AuthTestClient.SignInAsync(client, TestApiFactory.AdminEmail, adminPassword);
 
     private static MultipartFormDataContent MakeForm(
         byte[] fileBytes,
@@ -205,5 +199,4 @@ public sealed class ProductImportEndpointTests(PostgreSqlFixture fixture) : ICla
     private static byte[] CsvBytes(string row) =>
         Encoding.UTF8.GetBytes($"name,sku,description,category,price,stock,weight_kg\n{row}\n");
 
-    private sealed record LoginResponse(string AccessToken, DateTimeOffset ExpiresAtUtc);
 }

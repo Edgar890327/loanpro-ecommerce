@@ -6,9 +6,6 @@ import { apiRequest } from '../../../shared/api/api'
 import i18n from '../../../shared/i18n/i18n'
 
 vi.mock('../../../shared/api/api', () => ({ apiRequest: vi.fn() }))
-vi.mock('../../../shared/auth/auth-context', () => ({
-  useAuth: () => ({ token: 'admin-token' }),
-}))
 vi.mock('../../../shared/notifications/useNotifications', () => ({
   useNotifications: () => ({ notify: vi.fn() }),
 }))

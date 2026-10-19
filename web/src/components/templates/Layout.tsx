@@ -1,11 +1,13 @@
-import { Link, Outlet } from 'react-router-dom'
+import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../shared/auth/auth-context'
 import { useCart } from '../../features/cart/state/useCart'
 
 export function Layout() {
   const { i18n, t } = useTranslation()
-  const { token, signOut } = useAuth()
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const isAdmin = user?.role === 'Admin'
   const { items } = useCart()
 
   return (
@@ -18,14 +20,32 @@ export function Layout() {
         <nav aria-label={t('mainNavigation')}>
           <Link to="/">{t('home')}</Link>
           <Link to="/cart">{t('cart')} ({items.reduce((count, item) => count + item.quantity, 0)})</Link>
-          {token && <Link to="/admin/products">{t('products')}</Link>}
-          {token && <Link to="/admin/settings">{t('settingsTitle')}</Link>}
-          {token && <Link to="/admin/orders">{t('orderHistory')}</Link>}
-          {token && <Link to="/admin/error-logs">{t('errorLogs')}</Link>}
+          {isAdmin && <Link to="/admin/products">{t('products')}</Link>}
+          {isAdmin && <Link to="/admin/settings">{t('settingsTitle')}</Link>}
+          {isAdmin && <Link to="/admin/orders">{t('orderHistory')}</Link>}
+          {isAdmin && <Link to="/admin/error-logs">{t('errorLogs')}</Link>}
         </nav>
-        {token
-          ? <button className="text-button" type="button" onClick={signOut}>{t('logout')}</button>
-          : <Link to="/login">{t('login')}</Link>}
+        <div className="account-menu" role="group" aria-label={t('accountMenu')}>
+          {user
+            ? (
+              <>
+                <span className="account-name">{user.fullName}</span>
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => void logout().finally(() => navigate('/'))}
+                >
+                  {t('logout')}
+                </button>
+              </>
+            )
+            : (
+              <>
+                <Link to="/login">{t('login')}</Link>
+                <Link to="/register">{t('register')}</Link>
+              </>
+            )}
+        </div>
         <div className="language-switcher" role="group" aria-label={t('language')}>
           <button
             type="button"

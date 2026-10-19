@@ -3,22 +3,20 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ApiError, apiRequest, translateApiError } from '../../../shared/api/api'
-import { useAuth } from '../../../shared/auth/auth-context'
 import { LoadingSkeleton } from '../../../components/atoms/LoadingSkeleton'
 import { formatCurrency } from '../../../shared/i18n/format'
 import type { ProductPageData } from '../types/ProductPageData'
 
 export function ProductListPage() {
   const { t, i18n } = useTranslation()
-  const { token } = useAuth()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const products = useQuery({
     queryKey: ['products', page],
-    queryFn: () => apiRequest<ProductPageData>(`/api/admin/products?page=${page}&pageSize=10`, token),
+    queryFn: () => apiRequest<ProductPageData>(`/api/admin/products?page=${page}&pageSize=10`),
   })
   const removeProduct = useMutation({
-    mutationFn: (id: string) => apiRequest<void>(`/api/admin/products/${id}`, token, { method: 'DELETE' }),
+    mutationFn: (id: string) => apiRequest<void>(`/api/admin/products/${id}`, { method: 'DELETE' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
   })
   const pages = Math.max(1, Math.ceil((products.data?.totalCount ?? 0) / 10))
