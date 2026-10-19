@@ -33,6 +33,7 @@ export function OrderHistoryPage() {
               <thead>
                 <tr>
                   <th scope="col">{t('orderReferenceHeader')}</th>
+                  <th scope="col">{t('customer')}</th>
                   <th scope="col">{t('orderDate')}</th>
                   <th scope="col">{t('orderState')}</th>
                   <th scope="col">{t('paymentProvider')}</th>
@@ -42,7 +43,8 @@ export function OrderHistoryPage() {
               <tbody>
                 {orders.data.items.map((order) => (
                   <tr key={order.id}>
-                    <td>{order.id}</td>
+                    <td>{order.orderNumber}</td>
+                    <td>{order.customerName}<br /><small>{order.customerEmail}</small></td>
                     <td>{formatDate(order.createdAtUtc, i18n.language)}</td>
                     <td>{t(`orderState${order.state}`, { defaultValue: order.state })}</td>
                     <td>{order.paymentProviderKey

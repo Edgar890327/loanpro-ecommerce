@@ -1,5 +1,8 @@
 export type OrderHistoryItem = {
   id: string
+  orderNumber: string
+  customerName: string
+  customerEmail: string
   state: string
   createdAtUtc: string
   subtotal: number

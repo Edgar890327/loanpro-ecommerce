@@ -17,6 +17,9 @@ describe('admin order history', () => {
     vi.mocked(apiRequest).mockResolvedValue({
       items: [{
         id: 'order-123',
+        orderNumber: 'ORD-2026-000123',
+        customerName: 'Ada Lovelace',
+        customerEmail: 'ada@example.com',
         state: 'Paid',
         createdAtUtc: '2026-05-15T12:30:00.000Z',
         subtotal: 24.5,
@@ -37,6 +40,9 @@ describe('admin order history', () => {
     )
 
     expect(await screen.findByRole('table')).toBeInTheDocument()
+    expect(screen.getByText('ORD-2026-000123')).toBeInTheDocument()
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument()
+    expect(screen.getByText('ada@example.com')).toBeInTheDocument()
     expect(screen.getByText('Paid')).toBeInTheDocument()
     expect(screen.getByText('Simulated')).toBeInTheDocument()
     expect(screen.getByText('$27.50')).toBeInTheDocument()

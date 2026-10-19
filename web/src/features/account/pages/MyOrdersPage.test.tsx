@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest } from '../../../shared/api/api'
+import { formatCurrency, formatDate } from '../../../shared/i18n/format'
 import i18n from '../../../shared/i18n/i18n'
 import { MyOrdersPage } from './MyOrdersPage'
 
@@ -132,6 +133,19 @@ describe('my purchases page', () => {
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'Paid' } })
 
     expect(screen.getByTestId('location')).toHaveTextContent('?status=Paid')
+  })
+
+  it.each(['en-US', 'es'])('formats the order number, date and total for %s', async (language) => {
+    await i18n.changeLanguage(language)
+    vi.mocked(apiRequest).mockResolvedValue(page([order()]))
+
+    renderPage()
+
+    const table = within(await screen.findByRole('table'))
+    expect(table.getByRole('link', { name: 'ORD-2026-000123' })).toBeInTheDocument()
+    const text = screen.getByRole('table').textContent
+    expect(text).toContain(formatDate('2026-05-15T12:30:00.000Z', language))
+    expect(text).toContain(formatCurrency(1234.5, language))
   })
 
   it('counts down the continue-payment action of a valid reservation and expires it', async () => {

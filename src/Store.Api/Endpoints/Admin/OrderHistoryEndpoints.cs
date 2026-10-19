@@ -32,6 +32,9 @@ public static class OrderHistoryEndpoints
         return Results.Ok(new OrderHistoryPageResponse(
             result.Items.Select(item => new OrderHistoryResponse(
                 item.Id,
+                item.OrderNumber,
+                item.CustomerName,
+                item.CustomerEmail,
                 item.State,
                 new DateTimeOffset(DateTime.SpecifyKind(item.CreatedAtUtc, DateTimeKind.Utc)),
                 item.Subtotal,

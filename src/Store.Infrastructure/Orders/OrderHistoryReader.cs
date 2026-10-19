@@ -18,14 +18,22 @@ public sealed class OrderHistoryReader(IDbContextFactory<StoreDbContext> context
             .ThenByDescending(order => order.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(order => new OrderHistoryItem(
-                order.Id,
-                order.State.ToString(),
-                order.CreatedAtUtc,
-                order.Subtotal,
-                order.Shipping,
-                order.Total,
-                order.Payments.Select(payment => payment.ProviderKey).FirstOrDefault()))
+            .Join(
+                database.Users.AsNoTracking(),
+                order => order.CustomerId,
+                user => user.Id,
+                (order, user) => new { order, user })
+            .Select(row => new OrderHistoryItem(
+                row.order.Id,
+                row.order.OrderNumber,
+                row.user.FullName,
+                row.user.Email,
+                row.order.State.ToString(),
+                row.order.CreatedAtUtc,
+                row.order.Subtotal,
+                row.order.Shipping,
+                row.order.Total,
+                row.order.Payments.Select(payment => payment.ProviderKey).FirstOrDefault()))
             .ToListAsync(cancellationToken);
         return new OrderHistoryPage(orders, page, pageSize, totalCount);
     }

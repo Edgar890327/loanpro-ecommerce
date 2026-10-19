@@ -198,6 +198,9 @@ public sealed class ProductAdminEndpointTests(PostgreSqlFixture fixture) : IClas
             .EnumerateArray()
             .Single(item => item.GetProperty("id").GetGuid() == order.Id);
 
+        Assert.Equal(order.OrderNumber, matchingOrder.GetProperty("orderNumber").GetString());
+        Assert.Equal("Test Customer", matchingOrder.GetProperty("customerName").GetString());
+        Assert.Contains("@example.com", matchingOrder.GetProperty("customerEmail").GetString());
         Assert.Equal("Paid", matchingOrder.GetProperty("state").GetString());
         Assert.Equal(3.50m, matchingOrder.GetProperty("shipping").GetDecimal());
         Assert.Equal(3.50m, matchingOrder.GetProperty("total").GetDecimal());
