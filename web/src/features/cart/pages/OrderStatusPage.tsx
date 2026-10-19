@@ -79,9 +79,11 @@ export function OrderStatusPage() {
         <div><dt>{t('shipping')}</dt><dd>{formatCurrency(order.data.shipping, i18n.language)}</dd></div>
         <div><dt>{t('total')}</dt><dd>{formatCurrency(order.data.total, i18n.language)}</dd></div>
       </dl>
-      {canCancel && <button type="button" onClick={() => cancel.mutate()} disabled={cancel.isPending}>{t('cancelOrder')}</button>}
       {cancel.isError && <p role="alert">{translateApiError(cancel.error, t, 'cancelOrderFailed')}</p>}
-      <Link to="/">{t('backToCatalog')}</Link>
+      <div className="button-row">
+        {canCancel && <button type="button" className="danger-button" onClick={() => cancel.mutate()} disabled={cancel.isPending}>{t('cancelOrder')}</button>}
+        <Link to="/" className="secondary-button">{t('backToCatalog')}</Link>
+      </div>
     </section>
   )
 }

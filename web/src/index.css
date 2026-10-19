@@ -533,6 +533,37 @@ th {
   color: #b42318;
 }
 
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.7rem;
+  padding: 0.6rem 1rem;
+  color: #b42318;
+  background: #fff;
+  border: 1px solid #b42318;
+  border-radius: 0.55rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.danger-button:hover:not(:disabled) {
+  color: #fff;
+  background: #b42318;
+}
+
+.danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .pagination {
   display: flex;
   align-items: center;
