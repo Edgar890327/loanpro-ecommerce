@@ -30,6 +30,7 @@ export function Layout() {
             ? (
               <>
                 <span className="account-name">{user.fullName}</span>
+                {user.role === 'Customer' && <Link to="/account/orders">{t('myOrders')}</Link>}
                 <button
                   className="text-button"
                   type="button"

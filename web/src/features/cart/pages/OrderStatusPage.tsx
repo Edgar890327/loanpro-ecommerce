@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { apiRequest, translateApiError } from '../../../shared/api/api'
 import { PaymentCheckout } from '../payments/PaymentCheckout'
@@ -13,6 +13,7 @@ export function OrderStatusPage() {
   const { t, i18n } = useTranslation()
   const { id } = useParams()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [now, setNow] = useState(Date.now())
   const order = useQuery({
     queryKey: ['order', id],
@@ -37,6 +38,11 @@ export function OrderStatusPage() {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [])
+
+  const paid = order.data?.state === 'Paid'
+  useEffect(() => {
+    if (paid) navigate(`/account/orders/${id}`, { replace: true })
+  }, [paid, id, navigate])
 
   const refreshOrder = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['order', id] })

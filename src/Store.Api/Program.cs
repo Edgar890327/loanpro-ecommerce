@@ -163,6 +163,7 @@ app.MapProductImportEndpoints();
 app.MapErrorLogEndpoints();
 Store.Api.Admin.OrderHistoryEndpoints.MapOrderHistoryEndpoints(app);
 Store.Api.Orders.OrderEndpoints.MapOrderEndpoints(app);
+Store.Api.Me.MyOrdersEndpoints.MapMyOrdersEndpoints(app);
 Store.Api.Payments.PaymentEndpoints.MapPaymentEndpoints(app);
 Store.Api.Admin.PaymentProviderEndpoints.MapPaymentProviderEndpoints(app);
 Store.Api.Admin.SettingsEndpoints.MapSettingsEndpoints(app);

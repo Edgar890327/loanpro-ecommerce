@@ -56,6 +56,7 @@ public static class DependencyInjection
             provider => provider.GetRequiredService<ShippingStrategyRegistry>());
         services.AddScoped<IShippingQuoteService, ShippingQuoteService>();
         services.AddScoped<IOrderService, OrderService>();
+        services.AddScoped<IMyOrdersReader, Store.Infrastructure.MyOrders.MyOrdersReader>();
         services.AddSingleton<IPasswordHasher, Store.Infrastructure.Identity.AspNetPasswordHasher>();
         services.AddScoped<IUserRepository, Store.Infrastructure.Identity.UserRepository>();
         services.AddScoped<IAccountService, AccountService>();

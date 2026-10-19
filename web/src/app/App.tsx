@@ -14,6 +14,8 @@ import { PublicProductDetailPage } from '../features/catalog/pages/PublicProduct
 import { CartPage } from '../features/cart/pages/CartPage'
 import { CheckoutPage } from '../features/cart/pages/CheckoutPage'
 import { OrderStatusPage } from '../features/cart/pages/OrderStatusPage'
+import { MyOrderDetailPage } from '../features/account/pages/MyOrderDetailPage'
+import { MyOrdersPage } from '../features/account/pages/MyOrdersPage'
 import { SettingsPage } from '../features/settings/pages/SettingsPage'
 import { CartProvider } from '../features/cart/state/CartProvider'
 import { GlobalErrorBoundary } from './GlobalErrorBoundary'
@@ -32,6 +34,8 @@ const router = createBrowserRouter([
       { path: '/cart', element: <CartPage /> },
       { path: '/checkout', element: <ProtectedRoute role="Customer"><CheckoutPage /></ProtectedRoute> },
       { path: '/orders/:id', element: <ProtectedRoute role="Customer"><OrderStatusPage /></ProtectedRoute> },
+      { path: '/account/orders', element: <ProtectedRoute role="Customer"><MyOrdersPage /></ProtectedRoute> },
+      { path: '/account/orders/:id', element: <ProtectedRoute role="Customer"><MyOrderDetailPage /></ProtectedRoute> },
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
       {
